@@ -29,6 +29,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import java.io.File
 
 class MainActivity : ComponentActivity() {
@@ -151,7 +152,6 @@ class MainActivity : ComponentActivity() {
                     Surface(shape = RoundedCornerShape(26.dp), color = Panel) {
                         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text("早安，昨晚睡得怎么样？", fontSize = 20.sp, color = Cream, fontWeight = FontWeight.Medium)
-                            Text("选一个真实感受才能结束这一晚；户外照片可稍后补拍，不是必填。", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
                             listOf("清醒", "一般", "很困").forEach { feeling ->
                                 OutlinedButton(onClick = { runAction { app.repository.feeling(id, feeling); feelingId = null } },
                                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(feeling, fontSize = 16.sp, color = Cream) }
@@ -206,7 +206,8 @@ class MainActivity : ComponentActivity() {
     }
     private fun share(records: List<NightRecord>) = runAction {
         check(records.isNotEmpty()) { "还没有可分享的记录" }
-        val files = withContext(Dispatchers.IO) { ShareExporter(this@MainActivity).images(records) }
+        val role = app.rolePreferences.flow.first().role
+        val files = withContext(Dispatchers.IO) { ShareExporter(this@MainActivity, partnerName(role)).images(records) }
         startActivity(Intent(this@MainActivity, SharePreviewActivity::class.java).putStringArrayListExtra("paths", ArrayList(files.map { it.absolutePath })))
     }
     private fun exportCsv(records: List<NightRecord>) = runAction {

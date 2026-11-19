@@ -8,7 +8,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 /** Paginated image export keeps long reasons intact without allocating an unbounded bitmap. */
-class ShareExporter(private val context: Context) {
+class ShareExporter(private val context: Context, private val partner: String = "你") {
     private val directory get() = File(context.cacheDir, "exports").apply { mkdirs() }
     private val stamp get() = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS"))
     fun csv(records: List<NightRecord>): File {
@@ -97,7 +97,7 @@ class ShareExporter(private val context: Context) {
             y += 20
         }
         paragraph("就寝时间为本人声明；记录间隔不等于真实睡眠。", 22f, muted)
-        paragraph("晚安 · 分享给关心我的人", 23f, mint)
+        paragraph("晚安，分享给 $partner", 23f, mint)
         finish()
         return files
     }
