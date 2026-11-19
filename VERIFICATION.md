@@ -113,6 +113,12 @@
 - 未在小米真机上实测，厂商页面入口可能因 HyperOS 版本不同而回退到应用详情。
 - 0.9.5（versionCode 15）已安装到 vivo X100s Pro；`testDebugUnitTest` 12 项、`lintDebug`、`assembleDebug` 通过。
 
+## 0.9.7 醒来感受写入邮件
+
+- 醒来邮件改为在用户选完感受后发送，正文新增「醒来感受：清醒/一般/很困」。未选感受前不会发醒来邮件；中断邮件仍在填原因时发送。
+- 起床感受弹窗标题改为「BB，昨晚睡得怎么样？」，仍然必选、没有跳过按钮。
+- 0.9.7（versionCode 17）已安装到 vivo X100s Pro；`testDebugUnitTest` 12 项、`lintDebug`、`assembleDebug` 通过。
+
 ## 用户实测与验收范围调整
 
 - 用户已在 vivo 上亲自测试拿起/倾斜检测，并明确将此检查视为完成。

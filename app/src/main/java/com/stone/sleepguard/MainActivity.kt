@@ -151,7 +151,7 @@ class MainActivity : ComponentActivity() {
                 feelingId?.let { id -> Dialog(onDismissRequest = { }) {
                     Surface(shape = RoundedCornerShape(26.dp), color = Panel) {
                         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("早安，昨晚睡得怎么样？", fontSize = 20.sp, color = Cream, fontWeight = FontWeight.Medium)
+                            Text("BB，昨晚睡得怎么样？", fontSize = 20.sp, color = Cream, fontWeight = FontWeight.Medium)
                             listOf("清醒", "一般", "很困").forEach { feeling ->
                                 OutlinedButton(onClick = { runAction { app.repository.feeling(id, feeling); feelingId = null } },
                                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(feeling, fontSize = 16.sp, color = Cream) }

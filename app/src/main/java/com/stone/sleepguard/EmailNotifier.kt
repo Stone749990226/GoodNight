@@ -55,6 +55,7 @@ object EmailNotifier {
         }
         Payload("WAKE", "☀️ ${name}说${partner}早安", """
             $name 在 ${clock(wake)} 和 $partner 说早安。
+            醒来感受：${record.night.feeling ?: "—"}
             最终就寝：${clock(record.finalBedAt)}
             记录间隔：${intervalText(record.interval)}
             夜间中断：${record.disruptions.size} 次

@@ -172,10 +172,18 @@ class SleepRepository(private val context: Context) {
             dao.update(record.night.copy(phase = Phase.AWAKE, wakeAt = now, heartbeatAt = now))
             dao.insert(NightEvent(nightId = record.night.id, at = now, type = "WAKE", detail = "本人点击醒了；监控结束"))
         }
-        dao.record(record.night.id)?.let { EmailNotifier.wake(context, it) }
         record.night.id
     }
-    suspend fun feeling(id: Long, feeling: String) = mutex.withLock { dao.record(id)?.night?.let { dao.update(it.copy(feeling = feeling)) } }
+    suspend fun feeling(id: Long, feeling: String) = mutex.withLock {
+        val record = dao.record(id) ?: return@withLock
+        val firstFeeling = record.night.feeling.isNullOrBlank()
+        dao.update(record.night.copy(feeling = feeling))
+        // 醒来邮件等感受选好后再发，保证邮件里包含「清醒/一般/很困」。
+        if (firstFeeling && record.night.phase == Phase.AWAKE) {
+            dao.record(id)?.takeIf { (it.night.wakeAt ?: 0) > System.currentTimeMillis() - 24 * 3_600_000L }
+                ?.let { EmailNotifier.wake(context, it) }
+        }
+    }
     suspend fun photo(id: Long, path: String) = mutex.withLock { dao.record(id)?.night?.let { dao.update(it.copy(photo = path)) } }
     suspend fun event(type: String, detail: String = "") = mutex.withLock {
         val record = dao.active() ?: return@withLock
