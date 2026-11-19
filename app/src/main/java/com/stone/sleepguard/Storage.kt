@@ -41,14 +41,13 @@ interface SleepDao {
 abstract class SleepDatabase : RoomDatabase() { abstract fun dao(): SleepDao }
 
 private val Context.settingsStore by preferencesDataStore("settings")
-data class SleepSettings(val targetBed: Int = 1410, val targetWake: Int = 450, val sensitivity: String = "中")
+data class SleepSettings(val targetBed: Int = 1410, val targetWake: Int = 450)
 class SleepPreferences(context: Context) {
     private val store = context.settingsStore
     private val bed = intPreferencesKey("bed")
     private val wake = intPreferencesKey("wake")
-    private val sensitivity = stringPreferencesKey("sensitivity")
-    val flow = store.data.map { SleepSettings(it[bed] ?: 1410, it[wake] ?: 450, it[sensitivity] ?: "中") }
-    suspend fun save(value: SleepSettings) { store.edit { it[bed] = value.targetBed; it[wake] = value.targetWake; it[sensitivity] = value.sensitivity } }
+    val flow = store.data.map { SleepSettings(it[bed] ?: 1410, it[wake] ?: 450) }
+    suspend fun save(value: SleepSettings) { store.edit { it[bed] = value.targetBed; it[wake] = value.targetWake } }
 }
 
 data class PowerStatus(val plugged: Boolean, val charging: Boolean, val percent: Int) {

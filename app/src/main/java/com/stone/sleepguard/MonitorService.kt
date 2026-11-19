@@ -35,7 +35,6 @@ class MonitorService : Service(), SensorEventListener {
     private var overlayId: Long? = null
     private var foregroundOk = false
     private var lastBeat = 0L
-    private var sensitivity = "中"
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val type = when (intent.action) {
@@ -69,7 +68,6 @@ class MonitorService : Service(), SensorEventListener {
             addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT)
             addAction(Intent.ACTION_POWER_CONNECTED); addAction(Intent.ACTION_POWER_DISCONNECTED)
         }, ContextCompat.RECEIVER_NOT_EXPORTED)
-        scope.launch { app.preferences.flow.collect { sensitivity = it.sensitivity; configure() } }
         scope.launch { repo.active.collect { current = it; configure(); showPending() } }
         scope.launch {
             while (isActive) {
@@ -112,7 +110,7 @@ class MonitorService : Service(), SensorEventListener {
     private fun configure() {
         val record = current
         val enabled = !ending && record?.night?.phase in listOf(Phase.SETTLING, Phase.MONITORING)
-        val key = if (enabled) "${record?.night?.id}:${record?.night?.lastSleepAt}:$sensitivity" else null
+        val key = if (enabled) "${record?.night?.id}:${record?.night?.lastSleepAt}" else null
         if (key != sensorKey) {
             sensors.unregisterListener(this)
             detector = null; sensorKey = null; detecting = false
@@ -120,7 +118,7 @@ class MonitorService : Service(), SensorEventListener {
             if (enabled) {
                 val sensor = sensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
                 if (sensor != null && sensors.registerListener(this, sensor, 100_000, 0)) {
-                    detector = MotionDetector(sensitivity); sensorKey = key
+                    detector = MotionDetector(); sensorKey = key
                     wakeLock.acquire(600_000L)
                 } else {
                     app.message.value = "无法启用加速度传感器，监控已中断"

@@ -125,7 +125,7 @@ class MainActivity : ComponentActivity() {
                         Text("只记下现在的真实感受。", color = Muted)
                         listOf("清醒", "一般", "很困").forEach { feeling -> OutlinedButton(onClick = { runAction { app.repository.feeling(id, feeling); feelingId = null } }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(feeling) } }
                     } }, confirmButton = { TextButton(onClick = { feelingId = null }) { Text("稍后补充") } }) }
-                if (diagnostic) DiagnosticDialog(this@MainActivity, preferences.sensitivity) { diagnostic = false }
+                if (diagnostic) DiagnosticDialog(this@MainActivity) { diagnostic = false }
                 if (exportRange) AlertDialog(onDismissRequest = { exportRange = false }, title = { Text("导出记录表格") }, text = {
                     Column { listOf(1 to "最近一晚", 7 to "最近7天", 30 to "最近30天").forEach { (days, label) -> TextButton(onClick = { exportRange = false; exportCsv(recordsForDays(records, days)) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(label) } } }
                 }, confirmButton = { TextButton(onClick = { exportRange = false }) { Text("取消") } })

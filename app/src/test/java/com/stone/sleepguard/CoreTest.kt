@@ -3,6 +3,7 @@ package com.stone.sleepguard
 import org.junit.Assert.*
 import org.junit.Test
 import java.time.*
+import kotlin.math.*
 
 class CoreTest {
     @Test fun stablePhoneAndBriefVibrationDoNotTrigger() {
@@ -54,6 +55,15 @@ class CoreTest {
         val interruption = Interruption(id = 1, nightId = 2, detectedAt = 5000, reason = "测试")
         assertNull(NightRecord(night, listOf(interruption), emptyList()).finalBedAt)
         assertNotNull(NightRecord(night.copy(lastSleepAt = 6000), listOf(interruption), emptyList()).finalBedAt)
+    }
+    @Test fun fixedHighSensitivityDetectsFifteenDegreeTilt() {
+        val detector = MotionDetector()
+        for (t in 0L..1000L step 100) detector.sample(0f, 0f, 9.81f, t, false)
+        val rad = Math.toRadians(15.0)
+        val x = (9.81 * sin(rad)).toFloat()
+        val z = (9.81 * cos(rad)).toFloat()
+        val results = (1100L..4000L step 100).map { t -> detector.sample(x, 0f, z, t, true) }
+        assertTrue(results.filterNotNull().any { it.startsWith("倾斜") })
     }
     @Test fun customRangeIncludesBothEndsAndKeepsOrder() {
         fun record(id: Long, date: String) = NightRecord(Night(id = id, date = date, firstSleepAt = id,

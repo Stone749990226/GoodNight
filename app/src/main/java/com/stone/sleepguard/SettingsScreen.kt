@@ -15,6 +15,7 @@ import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.*
+import kotlinx.coroutines.delay
 
 @Composable internal fun SettingsScreen(settings: SleepSettings, tick: Int, context: Context, onSave: (SleepSettings) -> Unit,
     onNotifications: () -> Unit, onOverlay: () -> Unit, onBattery: () -> Unit, onVivo: () -> Unit,
@@ -28,11 +29,12 @@ import androidx.compose.ui.unit.*
         Text("修改只影响之后开始的夜晚，保留每一晚自己的目标。", fontSize = 12.sp, color = Muted, lineHeight = 20.sp)
     }
     SoftCard {
-        Text("移动检测灵敏度", fontSize = 17.sp, color = Cream)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            listOf("低", "中", "高").forEach { value -> FilterChip(selected = settings.sensitivity == value, onClick = { onSave(settings.copy(sensitivity = value)) }, label = { Text(value) }) }
+        Text("移动检测", fontSize = 17.sp, color = Cream)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("灵敏度", fontSize = 14.sp, color = Cream)
+            Text("固定为高", fontSize = 13.sp, color = Mint)
         }
-        Text("只在晚安后检测。低灵敏度减少轻触误报，高灵敏度更容易察觉移动。", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
+        Text("倾斜超过 12° 持续 0.5 秒，或移动超过 1.0 m/s² 持续 0.3 秒就会记录。不可调整，可自测确认。", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
         OutlinedButton(onClick = onDiagnostic, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("拿起检测自测") }
     }
     val notifications = remember(tick) { context.getSystemService(NotificationManager::class.java).areNotificationsEnabled() }
@@ -49,7 +51,7 @@ import androidx.compose.ui.unit.*
     SoftCard {
         SettingRow("导出 CSV 表格", "导出", onExport)
         Text("记录与照片保存在本机。分享前先预览，发送给谁由你选择。", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
-        Text("晚安 0.1.0", color = Muted, fontSize = 11.sp)
+        Text("晚安 ${BuildConfig.VERSION_NAME}", color = Muted, fontSize = 11.sp)
     }
     if (editBed) EditTimeDialog(settings.targetBed, "几点放下手机", { editBed = false }) { onSave(settings.copy(targetBed = it)); editBed = false }
     if (editWake) EditTimeDialog(settings.targetWake, "几点起床", { editWake = false }) { onSave(settings.copy(targetWake = it)); editWake = false }
@@ -69,27 +71,49 @@ import androidx.compose.ui.unit.*
         OutlinedTextField(value = value, onValueChange = { value = it }, label = { Text("24小时制，例如 23:30") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii))
     }, confirmButton = { TextButton(enabled = parsed != null, onClick = { parsed?.let(onSave) }) { Text("保存") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
 }
-@Composable internal fun DiagnosticDialog(context: Context, sensitivity: String, onDismiss: () -> Unit) {
-    var count by remember { mutableIntStateOf(0) }; var reading by remember { mutableStateOf("等待传感器") }
-    var lastResult by remember { mutableStateOf("先静置3秒，再拿起手机。") }
+@Composable internal fun DiagnosticDialog(context: Context, onDismiss: () -> Unit) {
+    var count by remember { mutableIntStateOf(0) }
+    var reading by remember { mutableStateOf("等待传感器") }
+    var lastResult by remember { mutableStateOf("还没有检测到动作。") }
+    var round by remember { mutableIntStateOf(0) }
+    var countdown by remember { mutableIntStateOf(3) }
+    LaunchedEffect(round) {
+        for (second in 3 downTo 1) { countdown = second; delay(1000) }
+        countdown = 0
+    }
     DisposableEffect(Unit) {
         val manager = context.getSystemService(SensorManager::class.java)
-        var detector = MotionDetector(sensitivity); var baselineUntil = SystemClock.elapsedRealtime() + 3000
+        var detector = MotionDetector()
+        var baselineUntil = SystemClock.elapsedRealtime() + 3000
         val listener = object : SensorEventListener {
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
             override fun onSensorChanged(event: SensorEvent) {
                 val t = event.timestamp / 1_000_000
                 reading = "X ${"%.1f".format(event.values[0])}   Y ${"%.1f".format(event.values[1])}   Z ${"%.1f".format(event.values[2])}"
                 val result = detector.sample(event.values[0], event.values[1], event.values[2], t, t >= baselineUntil)
-                if (result != null) { count++; lastResult = "$result · 请放下静置3秒后重试"; detector = MotionDetector(sensitivity); baselineUntil = t + 3000 }
+                if (result != null) {
+                    count++
+                    lastResult = "$result · 已记为一次活动"
+                    detector = MotionDetector()
+                    baselineUntil = t + 3000
+                    round++
+                }
             }
         }
         val sensor = manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         if (sensor == null || !manager.registerListener(listener, sensor, 100_000)) lastResult = "无法启用传感器"
         onDispose { manager.unregisterListener(listener) }
     }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("拿起检测自测") }, text = { Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("已检测 $count 次", color = Mint, fontSize = 28.sp); Text(lastResult, color = Cream); Text(reading, color = Muted, fontSize = 12.sp)
-        Text("这是前台自测，不会写入夜间记录。锁屏后台检测另需实际试用。", color = Muted, fontSize = 12.sp)
-    } }, confirmButton = { TextButton(onClick = onDismiss) { Text("完成") } })
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("拿起检测自测") }, text = {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("已检测 $count 次", color = Mint, fontSize = 26.sp, modifier = Modifier.weight(1f))
+                if (countdown > 0) Text("$countdown", color = Amber, fontSize = 44.sp)
+            }
+            Text(if (countdown > 0) "静置 $countdown 秒，倒计时结束后再拿起手机" else "现在拿起手机，看看会不会记为一次活动", color = Cream, lineHeight = 22.sp)
+            Text(lastResult, color = Cream, fontSize = 13.sp)
+            Text(reading, color = Muted, fontSize = 12.sp)
+            Text("固定为高灵敏度：倾斜超过 12° 持续 0.5 秒，或移动超过 1.0 m/s² 持续 0.3 秒。这是前台自测，不会写入夜间记录。", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+        }
+    }, confirmButton = { TextButton(onClick = onDismiss) { Text("完成") } })
 }

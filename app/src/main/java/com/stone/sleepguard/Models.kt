@@ -114,8 +114,8 @@ fun statistics(records: List<NightRecord>): Statistics {
         if (valid.isEmpty()) null else (100.0 * successes / valid.size).roundToInt())
 }
 
-/** Pure streaming detector. Samples are never persisted. */
-class MotionDetector(private val sensitivity: String = "中") {
+/** Pure streaming detector. Sensitivity is fixed at high; samples are never persisted. */
+class MotionDetector {
     private var gravity = doubleArrayOf(0.0, 0.0, 9.81)
     private var base: DoubleArray? = null
     private var initialized = false
@@ -137,8 +137,8 @@ class MotionDetector(private val sensitivity: String = "中") {
         val denominator = norm(gravity) * norm(baseline)
         val angle = if (denominator < 1) 0.0 else Math.toDegrees(acos((gravity.indices.sumOf { gravity[it] * baseline[it] } / denominator).coerceIn(-1.0, 1.0)))
         val acceleration = norm(DoubleArray(3) { raw[it] - gravity[it] })
-        val angleLimit = when (sensitivity) { "低" -> 30.0; "高" -> 12.0; else -> 20.0 }
-        val moveLimit = when (sensitivity) { "低" -> 2.2; "高" -> 1.0; else -> 1.5 }
+        val angleLimit = 12.0
+        val moveLimit = 1.0
         tiltSince = if (angle > angleLimit) tiltSince ?: timeMs else null
         moveSince = if (acceleration > moveLimit) moveSince ?: timeMs else null
         return when {
