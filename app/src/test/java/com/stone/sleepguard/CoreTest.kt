@@ -34,4 +34,33 @@ class CoreTest {
         assertEquals(1470, bedGoal(30))
         assertEquals(1410, bedGoal(1410))
     }
+    @Test fun editedTimesStayOnTheirOwnNight() {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val bed = bedTimestamp("2026-11-19", 23 * 60 + 30, zone)
+        val wake = wakeTimestamp("2026-11-19", 7 * 60, zone)
+        assertEquals(LocalDate.of(2026, 11, 19), Instant.ofEpochMilli(bed).atZone(zone).toLocalDate())
+        assertEquals(LocalDate.of(2026, 11, 20), Instant.ofEpochMilli(wake).atZone(zone).toLocalDate())
+        assertEquals(420, Instant.ofEpochMilli(wake).atZone(zone).let { it.hour * 60 + it.minute })
+        assertEquals(LocalDate.of(2026, 11, 20), Instant.ofEpochMilli(bedTimestamp("2026-11-19", 30, zone)).atZone(zone).toLocalDate())
+        assertEquals(1410, parseClock("23:30") ?: -1)
+        assertEquals(425, parseClock("7:05") ?: -1)
+        assertNull(parseClock("24:00"))
+        assertNull(parseClock("23:70"))
+        assertTrue(wake > bed)
+    }
+    @Test fun editedBedLaterThanInterruptionLeavesNightIncomplete() {
+        val night = Night(id = 2, date = "2026-11-19", firstSleepAt = 1000, lastSleepAt = 2000,
+            targetBed = 1410, targetWake = 450, wakeAt = 10000, phase = Phase.AWAKE)
+        val interruption = Interruption(id = 1, nightId = 2, detectedAt = 5000, reason = "测试")
+        assertNull(NightRecord(night, listOf(interruption), emptyList()).finalBedAt)
+        assertNotNull(NightRecord(night.copy(lastSleepAt = 6000), listOf(interruption), emptyList()).finalBedAt)
+    }
+    @Test fun customRangeIncludesBothEndsAndKeepsOrder() {
+        fun record(id: Long, date: String) = NightRecord(Night(id = id, date = date, firstSleepAt = id,
+            lastSleepAt = id, targetBed = 1410, targetWake = 450, phase = Phase.AWAKE), emptyList(), emptyList())
+        val records = listOf(record(3, "2026-11-18"), record(2, "2026-11-10"), record(1, "2026-11-02"))
+        assertEquals(listOf(3L, 2L), recordsForRange(records, LocalDate.parse("2026-11-10"), LocalDate.parse("2026-11-18")).map { it.night.id })
+        assertEquals(listOf(2L, 1L), recordsForRange(records, LocalDate.parse("2026-11-02"), LocalDate.parse("2026-11-10")).map { it.night.id })
+        assertEquals(3, recordsForRange(records, null, null).size)
+    }
 }

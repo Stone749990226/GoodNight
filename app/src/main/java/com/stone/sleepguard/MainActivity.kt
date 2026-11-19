@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
                 var feelingId by rememberSaveable { mutableStateOf<Long?>(null) }
                 var diagnostic by remember { mutableStateOf(false) }
                 var exportRange by remember { mutableStateOf(false) }
+                var deleted by remember { mutableStateOf<NightRecord?>(null) }
                 var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
                 var power by remember { mutableStateOf(powerStatus(this)) }
                 LaunchedEffect(Unit) {
@@ -68,6 +69,13 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); if (app.message.value == it) app.message.value = null } }
+                LaunchedEffect(deleted) {
+                    val record = deleted ?: return@LaunchedEffect
+                    val result = snackbar.showSnackbar("已删除 ${record.night.date} 晚的记录", actionLabel = "撤销", withDismissAction = true, duration = SnackbarDuration.Long)
+                    if (result == SnackbarResult.ActionPerformed) runAction { app.repository.restore(record) }
+                    else record.night.photo?.let { path -> File(path).delete() }
+                    deleted = null
+                }
                 LaunchedEffect(records, tick) {
                     if (intent.getBooleanExtra("feeling", false) && records.isNotEmpty()) {
                         feelingId = records.firstOrNull { it.night.phase == Phase.AWAKE && it.night.feeling == null }?.night?.id
@@ -87,7 +95,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }) { padding ->
                     key(tab) {
-                        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        val pageScroll = rememberScrollState()
+                        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(pageScroll).padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             when (tab) {
                                 0 -> TonightScreen(active, lastAwake, now, power, preferences, working,
                                     onSleep = { runAction { MonitorService.start(this@MainActivity, if (active?.night?.phase == Phase.RECOVERY) MonitorService.RESUME else MonitorService.SLEEP) } },
@@ -95,7 +104,10 @@ class MainActivity : ComponentActivity() {
                                     onReason = { id, text -> runAction { app.repository.reason(id, text) } },
                                     onFeeling = { feelingId = it }, onPhoto = { photo(it) },
                                     onShare = { id -> share(records.filter { it.night.id == id }) }, onPermissions = { tab = 2 }, permissionTick = tick, context = this@MainActivity)
-                                1 -> RecordsScreen(records, { feelingId = it }, { photo(it) }, { share(it) }, { id, text -> runAction { app.repository.reason(id, text) } })
+                                1 -> RecordsScreen(records, { feelingId = it }, { photo(it) }, { share(it) }, { id, text -> runAction { app.repository.reason(id, text) } },
+                                    onEdit = { id, edit -> runAction { app.repository.edit(id, edit) } },
+                                    onDelete = { id -> runAction { app.repository.deleteNight(id)?.let { deleted = it } } },
+                                    scrollState = pageScroll)
                                 else -> SettingsScreen(preferences, tick, this@MainActivity,
                                     onSave = { value -> runAction { app.preferences.save(value) } },
                                     onNotifications = { if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)

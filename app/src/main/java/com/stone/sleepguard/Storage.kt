@@ -28,6 +28,13 @@ interface SleepDao {
     @Insert suspend fun insert(interruption: Interruption): Long
     @Update suspend fun update(interruption: Interruption)
     @Insert suspend fun insert(event: NightEvent)
+    @Query("DELETE FROM interruptions WHERE nightId = :nightId") suspend fun deleteInterruptions(nightId: Long)
+    @Query("DELETE FROM events WHERE nightId = :nightId") suspend fun deleteEvents(nightId: Long)
+    @Query("DELETE FROM nights WHERE id = :nightId") suspend fun deleteNight(nightId: Long)
+    @Query("DELETE FROM interruptions WHERE id = :id") suspend fun deleteInterruption(id: Long)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun restoreNight(night: Night)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun restoreInterruption(interruption: Interruption)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun restoreEvent(event: NightEvent)
 }
 
 @Database(entities = [Night::class, Interruption::class, NightEvent::class], version = 1, exportSchema = false)
@@ -143,6 +150,44 @@ class SleepRepository(private val context: Context) {
         db.withTransaction {
             dao.update(record.night.copy(phase = phase, armedAt = if (phase == Phase.SETTLING) now + 15_000 else record.night.armedAt, heartbeatAt = now))
             dao.insert(NightEvent(nightId = record.night.id, at = now, type = "RESUME", detail = "恢复监控；保留原就寝声明和监控缺口"))
+        }
+    }
+
+    /** 删除已结束的一晚，返回删除前的快照供撤销。照片文件保留，撤销后仍可用。 */
+    suspend fun deleteNight(id: Long): NightRecord? = mutex.withLock {
+        val record = dao.record(id) ?: return@withLock null
+        check(record.night.phase == Phase.AWAKE) { "今晚还在守候，先点「我醒了」结束监控" }
+        db.withTransaction {
+            dao.deleteInterruptions(id)
+            dao.deleteEvents(id)
+            dao.deleteNight(id)
+        }
+        record
+    }
+
+    /** 用删除时的快照原样恢复，保留原 id、中断和事件。 */
+    suspend fun restore(record: NightRecord) = mutex.withLock {
+        db.withTransaction {
+            dao.restoreNight(record.night)
+            record.interruptions.forEach { dao.restoreInterruption(it) }
+            record.events.forEach { dao.restoreEvent(it) }
+        }
+    }
+
+    /** 修改已结束一晚的就寝/醒来时间与中断原因，并可移除误报中断。 */
+    suspend fun edit(id: Long, edit: NightEdit) = mutex.withLock {
+        db.withTransaction {
+            val record = dao.record(id) ?: error("记录不存在")
+            check(record.night.phase == Phase.AWAKE) { "今晚还在守候，先点「我醒了」结束监控" }
+            require(edit.wakeAt > edit.bedAt) { "醒来时间需要晚于就寝时间" }
+            edit.removedIds.filter { candidate -> record.interruptions.any { it.id == candidate } }.forEach { dao.deleteInterruption(it) }
+            edit.reasons.forEach { (interruptionId, text) ->
+                record.interruptions.firstOrNull { it.id == interruptionId }?.let {
+                    dao.update(it.copy(reason = text.trim().takeIf { value -> value.isNotEmpty() }))
+                }
+            }
+            dao.update(record.night.copy(lastSleepAt = edit.bedAt,
+                firstSleepAt = minOf(record.night.firstSleepAt, edit.bedAt), wakeAt = edit.wakeAt))
         }
     }
 }

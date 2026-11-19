@@ -87,6 +87,21 @@ fun localMinutes(t: Long): Int = Instant.ofEpochMilli(t).atZone(ZoneId.systemDef
 fun bedMinutes(t: Long): Int = localMinutes(t).let { if (it < 720) it + 1440 else it }
 fun bedGoal(m: Int) = if (m < 720) m + 1440 else m
 
+/** 编辑后的整晚数据；时间戳由「这一晚的日期 + 输入的时分」还原。 */
+data class NightEdit(val bedAt: Long, val wakeAt: Long, val reasons: Map<Long, String>, val removedIds: Set<Long>)
+
+private val CLOCK_INPUT = Regex("""^(\d{1,2})[:：]?(\d{2})$""")
+fun parseClock(text: String): Int? {
+    val match = CLOCK_INPUT.find(text.trim()) ?: return null
+    val hour = match.groupValues[1].toIntOrNull() ?: return null
+    val minute = match.groupValues[2].toIntOrNull() ?: return null
+    return if (hour in 0..23 && minute in 0..59) hour * 60 + minute else null
+}
+fun bedTimestamp(date: String, minutes: Int, zone: ZoneId = ZoneId.systemDefault()): Long =
+    LocalDate.parse(date).atStartOfDay(zone).plusMinutes((if (minutes < 720) minutes + 1440 else minutes).toLong()).toInstant().toEpochMilli()
+fun wakeTimestamp(date: String, minutes: Int, zone: ZoneId = ZoneId.systemDefault()): Long =
+    LocalDate.parse(date).plusDays(1).atStartOfDay(zone).plusMinutes(minutes.toLong()).toInstant().toEpochMilli()
+
 data class Statistics(val total: Int, val valid: Int, val averageBed: String, val averageWake: String, val rate: Int?)
 fun statistics(records: List<NightRecord>): Statistics {
     val valid = records.filter { it.valid }

@@ -3,6 +3,7 @@ package com.stone.sleepguard
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -11,24 +12,51 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.*
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 fun recordsForDays(records: List<NightRecord>, days: Int): List<NightRecord> {
     if (days == 1) return records.take(1)
     val cutoff = LocalDate.now().minusDays(days.toLong() - 1)
     return records.filter { LocalDate.parse(it.night.date) >= cutoff }
 }
+fun recordsForRange(records: List<NightRecord>, from: LocalDate?, to: LocalDate?): List<NightRecord> {
+    if (from == null || to == null) return records
+    return records.filter { val date = LocalDate.parse(it.night.date); !date.isBefore(from) && !date.isAfter(to) }
+}
+
+private fun LocalDate.toUtcMillis(): Long = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+private fun Long.toUtcDate(): LocalDate = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
+private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable internal fun RecordsScreen(records: List<NightRecord>, onFeeling: (Long) -> Unit, onPhoto: (Long) -> Unit,
-    onShare: (List<NightRecord>) -> Unit, onReason: (Long, String) -> Unit) {
+    onShare: (List<NightRecord>) -> Unit, onReason: (Long, String) -> Unit,
+    onEdit: (Long, NightEdit) -> Unit, onDelete: (Long) -> Unit, scrollState: ScrollState) {
     SectionLabel("每一晚", "YOUR RHYTHM")
     Text("看看时间，也记得看看自己。", color = Muted, fontSize = 13.sp)
     var days by rememberSaveable { mutableIntStateOf(7) }
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        listOf(7, 30).forEach { d -> FilterChip(selected = days == d, onClick = { days = d }, label = { Text("最近${d}天") }) }
+    var fromDay by rememberSaveable { mutableStateOf<Long?>(null) }
+    var toDay by rememberSaveable { mutableStateOf<Long?>(null) }
+    var showRangePicker by rememberSaveable { mutableStateOf(false) }
+    val from = fromDay?.let { LocalDate.ofEpochDay(it) }
+    val to = toDay?.let { LocalDate.ofEpochDay(it) }
+    val custom = from != null && to != null
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        FilterChip(selected = !custom && days == 7, onClick = { days = 7; fromDay = null; toDay = null }, label = { Text("最近7天") })
+        FilterChip(selected = !custom && days == 30, onClick = { days = 30; fromDay = null; toDay = null }, label = { Text("最近30天") })
+        FilterChip(selected = custom, onClick = { showRangePicker = true },
+            label = { Text(if (custom) "${from!!.shortText()}–${to!!.shortText()}" else "自定义日期") })
     }
-    val selected = recordsForDays(records, days)
+    val selected = if (custom) recordsForRange(records, from, to) else recordsForDays(records, days)
     val stats = statistics(selected)
     SoftCard {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -37,14 +65,55 @@ fun recordsForDays(records: List<NightRecord>, days: Int): List<NightRecord> {
         Text("${stats.total} 晚记录 · ${stats.valid} 晚有效；缺失、未完成及监控中断记录不参与平均。", fontSize = 11.sp, color = Muted, lineHeight = 18.sp)
         Trend(selected)
     }
+    var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var deletingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var expandedId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var jumpTarget by remember { mutableStateOf<Long?>(null) }
+    var jumpTick by remember { mutableIntStateOf(0) }
+    val cardTops = remember { mutableStateMapOf<Long, Int>() }
+    val density = LocalDensity.current
     if (selected.isEmpty()) SoftCard {
-        Text("第一声晚安，还没开始。", fontSize = 20.sp, color = Cream)
-        Text("今晚接上电，点一下“我去睡了”。明早回来，就有第一条记录。", color = Muted, lineHeight = 24.sp)
+        Text(if (custom) "所选日期没有记录。" else "第一声晚安，还没开始。", fontSize = 20.sp, color = Cream)
+        Text(if (custom) "换一段日期看看，或点回最近7天。" else "今晚接上电，点一下“我去睡了”。明早回来，就有第一条记录。", color = Muted, lineHeight = 24.sp)
     } else {
-        OutlinedButton(onClick = { onShare(selected) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("预览并分享这${days}天") }
-        SummaryTable(selected)
-        selected.forEach { RecordCard(it, onFeeling, onPhoto, onShare, onReason) }
+        OutlinedButton(onClick = { onShare(selected) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(if (custom) "预览并分享所选日期" else "预览并分享这${days}天") }
+        SummaryTable(selected) { id ->
+            expandedId = id
+            jumpTarget = id
+            jumpTick++
+        }
+        Text("点表格里的任意一晚，跳到下面的详情。", color = Muted, fontSize = 11.sp)
+        selected.forEach { record ->
+            RecordCard(record, onFeeling, onPhoto, onShare, onReason,
+                onEdit = { editingId = record.night.id }, onDelete = { deletingId = record.night.id },
+                expanded = expandedId == record.night.id,
+                onToggle = { expandedId = if (expandedId == record.night.id) null else record.night.id },
+                modifier = Modifier.onGloballyPositioned { coordinates -> cardTops[record.night.id] = coordinates.positionInParent().y.toInt() })
+        }
+        LaunchedEffect(jumpTick) {
+            val id = jumpTarget ?: return@LaunchedEffect
+            repeat(3) { withFrameNanos { } }
+            val margin = with(density) { 12.dp.toPx() }.toInt()
+            cardTops[id]?.let { top ->
+                val target = (top - margin).coerceIn(0, scrollState.maxValue)
+                scrollState.animateScrollTo(target)
+                withFrameNanos { }
+                cardTops[id]?.let { settled ->
+                    val expected = (settled - margin).coerceIn(0, scrollState.maxValue)
+                    if (kotlin.math.abs(expected - scrollState.value) > 8) scrollState.animateScrollTo(expected)
+                }
+            }
+        }
     }
+    records.firstOrNull { it.night.id == editingId }?.let { record ->
+        EditNightDialog(record, onSave = { edit -> onEdit(record.night.id, edit); editingId = null }, onDismiss = { editingId = null })
+    }
+    records.firstOrNull { it.night.id == deletingId }?.let { record ->
+        DeleteNightDialog(record, onConfirm = { onDelete(record.night.id); deletingId = null }, onDismiss = { deletingId = null })
+    }
+    if (showRangePicker) RangePickerDialog(from, to,
+        onPick = { start, end -> fromDay = start.toEpochDay(); toDay = end.toEpochDay(); showRangePicker = false },
+        onDismiss = { showRangePicker = false })
 }
 
 @Composable private fun Trend(records: List<NightRecord>) {
@@ -71,21 +140,25 @@ fun recordsForDays(records: List<NightRecord>, days: Int): List<NightRecord> {
         Text(sorted.lastOrNull()?.night?.date?.drop(5) ?: "", color = Muted, fontSize = 10.sp)
     }
 }
-@Composable private fun SummaryTable(records: List<NightRecord>) {
+@Composable private fun SummaryTable(records: List<NightRecord>, onSelect: (Long) -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Panel).horizontalScroll(rememberScrollState()).padding(16.dp)) {
         fun Modifier.cell() = width(112.dp).padding(vertical = 10.dp, horizontal = 4.dp)
         Row { listOf("夜晚", "首次说晚安", "最终就寝", "点击醒了", "中断次数", "记录间隔", "感受").forEach { Text(it, Modifier.cell(), fontSize = 12.sp, color = Mint) } }
         records.forEach { r ->
             HorizontalDivider(color = Color(0xFF2B3C46))
-            Row { listOf(r.night.date.drop(5), clock(r.night.firstSleepAt), clock(r.finalBedAt), clock(r.night.wakeAt), "${r.disruptions.size}", intervalText(r.interval), r.night.feeling ?: "待补充").forEach { Text(it, Modifier.cell(), fontSize = 12.sp, color = Cream) } }
+            Row(Modifier.fillMaxWidth().clickable { onSelect(r.night.id) }) {
+                listOf(r.night.date.drop(5), clock(r.night.firstSleepAt), clock(r.finalBedAt), clock(r.night.wakeAt), "${r.disruptions.size}", intervalText(r.interval), r.night.feeling ?: "待补充").forEachIndexed { index, value ->
+                    Text(value, Modifier.cell(), fontSize = 12.sp, color = if (index == 0) Mint else Cream)
+                }
+            }
         }
     }
 }
 @Composable private fun RecordCard(record: NightRecord, onFeeling: (Long) -> Unit, onPhoto: (Long) -> Unit,
-    onShare: (List<NightRecord>) -> Unit, onReason: (Long, String) -> Unit) {
-    var expanded by rememberSaveable(record.night.id) { mutableStateOf(false) }
-    SoftCard {
-        Row(Modifier.fillMaxWidth().clickable { expanded = !expanded }, horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    onShare: (List<NightRecord>) -> Unit, onReason: (Long, String) -> Unit, onEdit: () -> Unit, onDelete: () -> Unit,
+    expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    SoftCard(modifier) {
+        Row(Modifier.fillMaxWidth().clickable(onClick = onToggle), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(verticalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.weight(1f)) {
                 Text("${record.night.date} 晚", color = Cream, fontSize = 17.sp, fontWeight = FontWeight.Medium)
                 Text("${clock(record.finalBedAt)} → ${clock(record.night.wakeAt)} · ${record.disruptions.size} 次中断", color = Muted, fontSize = 12.sp)
@@ -111,6 +184,90 @@ fun recordsForDays(records: List<NightRecord>, days: Int): List<NightRecord> {
                 TextButton(onClick = { onPhoto(record.night.id) }) { Text(if (record.night.photo == null) "拍照" else "重新拍照") }
                 TextButton(onClick = { onShare(listOf(record)) }) { Text("分享") }
             }
+            if (record.night.phase == Phase.AWAKE) {
+                HorizontalDivider(color = Color(0xFF30424C))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = onEdit) { Text("编辑这一晚", color = Mint) }
+                    TextButton(onClick = onDelete) { Text("删除这一晚", color = Amber) }
+                }
+                Text("点错了、只是测试的记录，可以改时间或删除；删除后能撤销。", color = Muted, fontSize = 11.sp, lineHeight = 17.sp)
+            } else Text("今晚还在守候；点「我醒了」结束监控后，才能编辑或删除。", color = Muted, fontSize = 11.sp, lineHeight = 17.sp)
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable private fun RangePickerDialog(from: LocalDate?, to: LocalDate?, onPick: (LocalDate, LocalDate) -> Unit, onDismiss: () -> Unit) {
+    val today = LocalDate.now()
+    val state = rememberDateRangePickerState(
+        initialSelectedStartDateMillis = (from ?: today.minusDays(29)).toUtcMillis(),
+        initialSelectedEndDateMillis = (to ?: today).toUtcMillis())
+    val start = state.selectedStartDateMillis
+    val end = state.selectedEndDateMillis
+    DatePickerDialog(onDismissRequest = onDismiss, confirmButton = {
+        TextButton(enabled = start != null && end != null, onClick = {
+            if (start != null && end != null) onPick(start.toUtcDate(), end.toUtcDate())
+        }) { Text("确定") }
+    }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }) {
+        DateRangePicker(state = state, showModeToggle = false, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable private fun EditNightDialog(record: NightRecord, onSave: (NightEdit) -> Unit, onDismiss: () -> Unit) {
+    var bedText by remember(record.night.id) { mutableStateOf(clock(record.night.lastSleepAt)) }
+    var wakeText by remember(record.night.id) { mutableStateOf(clock(record.night.wakeAt)) }
+    var reasons by remember(record.night.id) { mutableStateOf(record.disruptions.associate { it.id to (it.reason ?: "") }) }
+    var removed by remember(record.night.id) { mutableStateOf(emptySet<Long>()) }
+    val bedMinutes = parseClock(bedText)
+    val wakeMinutes = parseClock(wakeText)
+    val bedAt = bedMinutes?.let { bedTimestamp(record.night.date, it) }
+    val wakeAt = wakeMinutes?.let { wakeTimestamp(record.night.date, it) }
+    val error = when {
+        bedMinutes == null || bedAt == null -> "就寝时间写成 23:30 这样"
+        wakeMinutes == null || wakeAt == null -> "醒来时间写成 07:00 这样"
+        wakeAt <= bedAt -> "醒来时间需要晚于就寝时间"
+        else -> null
+    }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("编辑 ${record.night.date} 晚") }, text = {
+        Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("时间按这一晚的日期换算；中午之前的就寝视为次日凌晨。", fontSize = 12.sp, color = Muted, lineHeight = 18.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(value = bedText, onValueChange = { if (it.length <= 5) bedText = it }, label = { Text("最终就寝") }, singleLine = true,
+                    modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next))
+                OutlinedTextField(value = wakeText, onValueChange = { if (it.length <= 5) wakeText = it }, label = { Text("点击醒了") }, singleLine = true,
+                    modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done))
+            }
+            val visible = record.disruptions.filterNot { it.id in removed }
+            if (visible.isNotEmpty()) {
+                Text("中断原因", color = Mint, fontSize = 12.sp)
+                visible.forEach { i ->
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${clock(i.detectedAt)} · ${i.detail}", fontSize = 12.sp, color = Muted, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { removed = removed + i.id }) { Text("移除", color = Amber, fontSize = 12.sp) }
+                        }
+                        OutlinedTextField(value = reasons[i.id].orEmpty(), onValueChange = { reasons = reasons + (i.id to it) },
+                            placeholder = { Text("原因待补充") }, minLines = 1, maxLines = 3, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+            if (removed.isNotEmpty()) Text("已标记移除 ${removed.size} 次误报中断，保存后生效。", fontSize = 11.sp, color = Amber)
+            Text("若就寝时间晚于某次中断，这一晚将显示为未完成，不参与作息平均。", fontSize = 11.sp, color = Muted, lineHeight = 17.sp)
+            error?.let { Text(it, color = Amber, fontSize = 12.sp) }
+        }
+    }, confirmButton = {
+        TextButton(enabled = error == null, onClick = {
+            if (bedAt != null && wakeAt != null) onSave(NightEdit(bedAt, wakeAt, reasons.filterKeys { it !in removed }, removed))
+        }) { Text("保存修改") }
+    }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
+}
+
+@Composable private fun DeleteNightDialog(record: NightRecord, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("删除这一晚？") }, text = {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("${record.night.date} 晚的记录会从本机删除，包括 ${record.disruptions.size} 次中断和 ${record.events.size} 条事件。")
+            Text("误删可以点下方的「撤销」恢复。", color = Muted, fontSize = 12.sp)
+        }
+    }, confirmButton = { TextButton(onClick = onConfirm) { Text("删除", color = Amber) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("保留") } })
 }
