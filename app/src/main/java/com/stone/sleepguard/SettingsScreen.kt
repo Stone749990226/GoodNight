@@ -55,9 +55,8 @@ import kotlinx.coroutines.delay
                 if (on && !email.configured) editEmail = true else onSaveEmail(email.copy(enabled = on))
             })
         }
-        SettingRow("发件邮箱", email.from.ifBlank { "去设置" }) { editEmail = true }
-        SettingRow("发送给", email.partner.ifBlank { "去设置" }) { editEmail = true }
-        SettingRow("授权码", if (email.hasAuthCode) "已保存" else "去设置") { editEmail = true }
+        if (email.configured) Text("${email.from} → ${email.partner}", fontSize = 11.sp, color = Muted)
+        SettingRow("邮件设置", if (email.configured) "已配置" else "去设置") { editEmail = true }
         OutlinedButton(onClick = onTestEmail, enabled = email.configured, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
             Text("发送测试邮件")
         }

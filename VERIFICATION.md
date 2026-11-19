@@ -73,6 +73,12 @@
 - 0.8.0（versionCode 8）已安装到 vivo X100s Pro；身份为 Stone，覆盖安装后仍为 Stone ⇄ Fanny，历史记录保留。手机上的邮件配置仍为空，需补 Fanny 的邮箱和 Stone 的授权码后才能发事件邮件。
 - `testDebugUnitTest` 11 项（新增双方身份配对）、`lintDebug`、`assembleDebug` 通过。
 
+## 0.8.1 邮件设置入口合并
+
+- 邮件卡去掉「发件邮箱 / 发送给 / 授权码」三个重复的「去设置」入口，改成一个「邮件设置」入口；邮箱、授权码、对方邮箱、SMTP 都在同一个弹窗配置。
+- 已配置时在卡片显示「发件邮箱 → 对方邮箱」，仍保留开关和测试邮件。
+- 0.8.1（versionCode 9）已安装到 vivo X100s Pro；`testDebugUnitTest` 11 项、`lintDebug`、`assembleDebug` 通过。
+
 ## 用户实测与验收范围调整
 
 - 用户已在 vivo 上亲自测试拿起/倾斜检测，并明确将此检查视为完成。
