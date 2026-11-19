@@ -119,6 +119,12 @@
 - 起床感受弹窗标题改为「BB，昨晚睡得怎么样？」，仍然必选、没有跳过按钮。
 - 0.9.7（versionCode 17）已安装到 vivo X100s Pro；`testDebugUnitTest` 12 项、`lintDebug`、`assembleDebug` 通过。
 
+## 0.9.8 / 0.9.9 删除 CSV 与关于页
+
+- 0.9.8：删除「导出 CSV 表格」入口、CSV 生成代码和设置页底部相关文案；分享只保留图片。
+- 0.9.9：设置新增「关于晚安」，内容为「Stone 写于 2026 年 11 月 19 日 / Stone 与 Fanny 相遇于 2026.10.25 💞 / 版本 0.9.9」；设置页底部原来的本机保存文案和版本号一并删除，避免重复。
+- 0.9.9（versionCode 19）已安装到 vivo X100s Pro；`testDebugUnitTest` 12 项、`lintDebug`、`assembleDebug` 通过。
+
 ## 用户实测与验收范围调整
 
 - 用户已在 vivo 上亲自测试拿起/倾斜检测，并明确将此检查视为完成。

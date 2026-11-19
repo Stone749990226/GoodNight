@@ -67,7 +67,6 @@ class MainActivity : ComponentActivity() {
                 var morningPrompt by rememberSaveable { mutableStateOf(false) }
                 var wakeDialog by rememberSaveable { mutableStateOf(false) }
                 var diagnostic by remember { mutableStateOf(false) }
-                var exportRange by remember { mutableStateOf(false) }
                 var deleted by remember { mutableStateOf<NightRecord?>(null) }
                 var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
                 var power by remember { mutableStateOf(powerStatus(this)) }
@@ -142,7 +141,7 @@ class MainActivity : ComponentActivity() {
                                         else openSettings(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) },
                                     onOverlay = { openSettings(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) },
                                     onBattery = { openSettings(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))) },
-                                    onBackground = { openBackgroundSettings() }, onDiagnostic = { diagnostic = true }, onExport = { exportRange = true })
+                                    onBackground = { openBackgroundSettings() }, onDiagnostic = { diagnostic = true })
                             }
                             if (working) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Mint)
                         }
@@ -167,9 +166,6 @@ class MainActivity : ComponentActivity() {
                 if (wakeDialog) NightWakeDialog(preferences.targetWake, onDismiss = { wakeDialog = false },
                     onConfirm = { wake -> wakeDialog = false; runAction { MonitorService.start(this@MainActivity, MonitorService.SLEEP, wake) } })
                 if (diagnostic) DiagnosticDialog(this@MainActivity) { diagnostic = false }
-                if (exportRange) AlertDialog(onDismissRequest = { exportRange = false }, title = { Text("导出记录表格") }, text = {
-                    Column { listOf(1 to "最近一晚", 7 to "最近7天", 30 to "最近30天").forEach { (days, label) -> TextButton(onClick = { exportRange = false; exportCsv(recordsForDays(records, days)) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(label) } } }
-                }, confirmButton = { TextButton(onClick = { exportRange = false }) { Text("取消") } })
                 if (!roleState.loaded) Box(Modifier.fillMaxSize().background(Ink))
                 else if (role == null) RolePickerScreen { chosen -> app.scope.launch { app.rolePreferences.choose(chosen) } }
             }
@@ -224,12 +220,6 @@ class MainActivity : ComponentActivity() {
         val role = app.rolePreferences.flow.first().role
         val files = withContext(Dispatchers.IO) { ShareExporter(this@MainActivity, partnerName(role)).images(records) }
         startActivity(Intent(this@MainActivity, SharePreviewActivity::class.java).putStringArrayListExtra("paths", ArrayList(files.map { it.absolutePath })))
-    }
-    private fun exportCsv(records: List<NightRecord>) = runAction {
-        check(records.isNotEmpty()) { "还没有可导出的记录" }
-        val file = withContext(Dispatchers.IO) { ShareExporter(this@MainActivity).csv(records) }
-        val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.files", file)
-        startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/csv").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "导出作息表格"))
     }
     companion object { @Volatile var visible = false }
 }

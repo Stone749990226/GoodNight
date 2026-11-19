@@ -11,17 +11,6 @@ import java.time.format.DateTimeFormatter
 class ShareExporter(private val context: Context, private val partner: String = "你") {
     private val directory get() = File(context.cacheDir, "exports").apply { mkdirs() }
     private val stamp get() = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS"))
-    fun csv(records: List<NightRecord>): File {
-        fun cell(value: String): String {
-            val safe = if (value.trimStart().firstOrNull() in listOf('=', '+', '-', '@')) "'$value" else value
-            return "\"${safe.replace("\"", "\"\"")}\""
-        }
-        val rows = mutableListOf(listOf("夜晚", "目标放下手机", "目标起床", "首次说晚安", "最终就寝（本人声明）", "点击醒了", "夜间中断次数", "记录间隔（非实际睡眠）", "感受", "末次灭屏", "晨起解锁参考", "原因详情", "监控及电源事件"))
-        records.forEach { r -> rows.add(listOf(r.night.date, minutesText(r.night.targetBed), minutesText(r.night.targetWake), clock(r.night.firstSleepAt), clock(r.finalBedAt), clock(r.night.wakeAt), r.disruptions.size.toString(), intervalText(r.interval), r.night.feeling ?: "待补充", clock(r.lastScreenOff), clock(r.morningUnlock),
-            r.interruptions.sortedBy { it.detectedAt }.joinToString("\n") { "${clock(it.detectedAt)} → ${clock(it.returnedAt)}：${if (it.morning) "起床操作" else it.reason ?: "待补记"}" },
-            r.events.filter { it.type in listOf("GAP", "RESUME", "POWER_ON", "POWER_OFF") }.joinToString("\n") { "${clock(it.at)} ${eventText(it)}" })) }
-        return File(directory, "晚安_${stamp}.csv").apply { writeText("\uFEFF" + rows.joinToString("\r\n") { it.joinToString(",", transform = ::cell) }, Charsets.UTF_8) }
-    }
 
     fun images(records: List<NightRecord>): List<File> {
         val files = mutableListOf<File>(); val prefix = stamp

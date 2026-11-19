@@ -26,11 +26,12 @@ import kotlinx.coroutines.delay
 @Composable internal fun SettingsScreen(settings: SleepSettings, email: EmailSettings, role: Role?, tick: Int, context: Context,
     onSave: (SleepSettings) -> Unit, onSaveEmail: (EmailSettings) -> Unit, onTestEmail: () -> Unit,
     onNotifications: () -> Unit, onOverlay: () -> Unit, onBattery: () -> Unit, onBackground: () -> Unit,
-    onDiagnostic: () -> Unit, onExport: () -> Unit) {
+    onDiagnostic: () -> Unit) {
     SectionLabel("按你的节奏", "PREFERENCES")
     var editBed by remember { mutableStateOf(false) }; var editWake by remember { mutableStateOf(false) }
     var editMaxSleep by remember { mutableStateOf(false) }
     var editEmail by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
     SoftCard {
         Text("目标作息", fontSize = 17.sp, color = Cream)
         SettingRow("放下手机", minutesText(settings.targetBed)) { editBed = true }
@@ -73,14 +74,23 @@ import kotlinx.coroutines.delay
         Text("请允许晚安后台运行，并在最近任务中锁定。厂商后台设置需在系统内确认。", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
     }
     SoftCard {
-        SettingRow("导出 CSV 表格", "导出", onExport)
-        Text("记录与照片保存在本机。分享前先预览，发送给谁由你选择。", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
-        Text("晚安 ${BuildConfig.VERSION_NAME}", color = Muted, fontSize = 11.sp)
+        SettingRow("关于晚安", "查看") { showAbout = true }
     }
     if (editBed) EditTimeDialog(settings.targetBed, "几点放下手机", { editBed = false }) { onSave(settings.copy(targetBed = it)); editBed = false }
     if (editWake) EditTimeDialog(settings.targetWake, "几点起床", { editWake = false }) { onSave(settings.copy(targetWake = it)); editWake = false }
     if (editMaxSleep) MaxSleepDialog(settings.maxSleepHours, { editMaxSleep = false }) { onSave(settings.copy(maxSleepHours = it)); editMaxSleep = false }
     if (editEmail) EmailConfigDialog(email, { editEmail = false }) { editEmail = false; onSaveEmail(it) }
+    if (showAbout) AboutDialog { showAbout = false }
+}
+@Composable private fun AboutDialog(onDismiss: () -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("关于晚安 🌙") }, text = {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Stone 写于 2026 年 11 月 19 日", color = Cream, fontSize = 14.sp)
+            Text("Stone 与 Fanny 相遇于 2026.10.25 💞", color = Cream, fontSize = 14.sp)
+            Text("版本 ${BuildConfig.VERSION_NAME}", color = Muted, fontSize = 12.sp)
+        }
+    }, confirmButton = { TextButton(onClick = onDismiss) { Text("好的") } },
+        containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
 }
 @Composable private fun EmailConfigDialog(current: EmailSettings, onDismiss: () -> Unit, onSave: (EmailSettings) -> Unit) {
     var from by remember { mutableStateOf(current.from) }
