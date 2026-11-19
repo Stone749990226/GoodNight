@@ -25,7 +25,7 @@ import kotlinx.coroutines.delay
 
 @Composable internal fun SettingsScreen(settings: SleepSettings, email: EmailSettings, role: Role?, tick: Int, context: Context,
     onSave: (SleepSettings) -> Unit, onSaveEmail: (EmailSettings) -> Unit, onTestEmail: () -> Unit,
-    onNotifications: () -> Unit, onOverlay: () -> Unit, onBattery: () -> Unit, onVivo: () -> Unit,
+    onNotifications: () -> Unit, onOverlay: () -> Unit, onBattery: () -> Unit, onBackground: () -> Unit,
     onDiagnostic: () -> Unit, onExport: () -> Unit) {
     SectionLabel("按你的节奏", "PREFERENCES")
     var editBed by remember { mutableStateOf(false) }; var editWake by remember { mutableStateOf(false) }
@@ -69,7 +69,7 @@ import kotlinx.coroutines.delay
         SettingRow("通知", if (notifications) "已开启" else "去开启", onNotifications)
         SettingRow("悬浮提醒", if (overlays) "已开启" else "去开启", onOverlay)
         SettingRow("电池优化豁免", if (battery) "已开启" else "去开启", onBattery)
-        SettingRow("vivo 后台与自启动", "去检查", onVivo)
+        SettingRow("后台运行与自启动", "去检查", onBackground)
         Text("请允许晚安后台运行，并在最近任务中锁定。厂商后台设置需在系统内确认。", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
     }
     SoftCard {

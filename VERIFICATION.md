@@ -106,6 +106,13 @@
 - 全部按身份自动反转：Fanny 手机上显示 Fanny说Stone晚安 / Fanny说Stone早安 / Fanny睡过头了。
 - 0.9.4（versionCode 14）已安装到 vivo X100s Pro；`testDebugUnitTest` 12 项、`lintDebug`、`assembleDebug` 通过。
 
+## 0.9.5 小米等厂商兼容
+
+- 设置里的「vivo 后台与自启动」改为通用「后台运行与自启动」；入口按 `Build.MANUFACTURER` 选择：小米/Redmi/POCO 打开自启动管理与省电策略，vivo/iQOO、OPPO/realme/一加、华为/荣耀分别尝试对应系统页面，最终回退到应用详情。提示文案改为「允许后台运行、自启动，并把省电策略设为无限制」。
+- 小米 14 / HyperOS（Android 14/15）满足 minSdk 29、targetSdk 35；应用没有 native 库和 vivo 私有 API，标准前台服务、加速度计、悬浮窗、通知、WorkManager 均可用。仍需在 HyperOS 手动允许自启动、省电策略无限制、悬浮窗和通知；若「后台弹出界面」被限制，自动拉起会退回悬浮层和通知。
+- 未在小米真机上实测，厂商页面入口可能因 HyperOS 版本不同而回退到应用详情。
+- 0.9.5（versionCode 15）已安装到 vivo X100s Pro；`testDebugUnitTest` 12 项、`lintDebug`、`assembleDebug` 通过。
+
 ## 用户实测与验收范围调整
 
 - 用户已在 vivo 上亲自测试拿起/倾斜检测，并明确将此检查视为完成。

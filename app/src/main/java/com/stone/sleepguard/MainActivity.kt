@@ -142,7 +142,7 @@ class MainActivity : ComponentActivity() {
                                         else openSettings(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) },
                                     onOverlay = { openSettings(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) },
                                     onBattery = { openSettings(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))) },
-                                    onVivo = { openVivoSettings() }, onDiagnostic = { diagnostic = true }, onExport = { exportRange = true })
+                                    onBackground = { openBackgroundSettings() }, onDiagnostic = { diagnostic = true }, onExport = { exportRange = true })
                             }
                             if (working) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Mint)
                         }
@@ -190,13 +190,28 @@ class MainActivity : ComponentActivity() {
         app.scope.launch { busy.value = true; try { block() } catch (e: Exception) { app.message.value = e.message ?: "操作失败，请再试一次" } finally { busy.value = false } }
     }
     private fun openSettings(intent: Intent) { runCatching { startActivity(intent) }.onFailure { app.message.value = "请在系统设置的应用管理中打开晚安" } }
-    private fun openVivoSettings() {
-        val candidates = listOf(
-            Intent().setComponent(ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity")),
-            Intent().setComponent(ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity")),
-            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
-        for (candidate in candidates) { try { startActivity(candidate); return } catch (_: Exception) { } }
-        app.message.value = "请在设置 → 应用 → 晚安中允许后台运行和自启动"
+    private fun openBackgroundSettings() {
+        val packagePage = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+        val candidates = when (Build.MANUFACTURER.lowercase()) {
+            "xiaomi", "redmi", "poco" -> listOf(
+                Intent().setComponent(ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")),
+                Intent().setComponent(ComponentName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.PowerKeeperActivity")),
+                packagePage)
+            "vivo", "iqoo" -> listOf(
+                Intent().setComponent(ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity")),
+                Intent().setComponent(ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity")),
+                packagePage)
+            "oppo", "realme", "oneplus" -> listOf(
+                Intent().setComponent(ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity")),
+                Intent().setComponent(ComponentName("com.oplus.safecenter", "com.oplus.safecenter.permission.startup.StartupAppListActivity")),
+                packagePage)
+            "huawei", "honor" -> listOf(
+                Intent().setComponent(ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity")),
+                packagePage)
+            else -> listOf(packagePage)
+        }
+        for (candidate in candidates) { if (runCatching { startActivity(candidate) }.isSuccess) return }
+        app.message.value = "请在设置 → 应用 → 晚安中允许后台运行、自启动，并把省电策略设为无限制"
     }
     private fun photo(id: Long) {
         val file = File(filesDir, "photos/${id}_${System.currentTimeMillis()}.jpg").apply { parentFile?.mkdirs() }
