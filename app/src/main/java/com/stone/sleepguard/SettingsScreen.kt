@@ -31,9 +31,10 @@ import kotlinx.coroutines.delay
         Text("超过这个时长还没点我醒了，就不会计入平均。", fontSize = 12.sp, color = Muted, lineHeight = 20.sp)
     }
     SoftCard {
-        Text("移动检测", fontSize = 17.sp, color = Cream)
-        Text("拿起或明显移动手机时会留下记录。可以先自测确认一次。", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
-        OutlinedButton(onClick = onDiagnostic, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("拿起检测自测") }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("移动检测", fontSize = 16.sp, color = Cream, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = onDiagnostic) { Text("开始自测") }
+        }
     }
     val notifications = remember(tick) { context.getSystemService(NotificationManager::class.java).areNotificationsEnabled() }
     val overlays = remember(tick) { Settings.canDrawOverlays(context) }
@@ -75,13 +76,8 @@ import kotlinx.coroutines.delay
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
         containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
 }
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun EditTimeDialog(initial: Int, title: String, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
-    val state = rememberTimePickerState(initialHour = initial / 60, initialMinute = initial % 60, is24Hour = true)
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, text = { TimePicker(state = state) },
-        confirmButton = { TextButton(onClick = { onSave(state.hour * 60 + state.minute) }) { Text("保存") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-        containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
+    WheelTimeDialog(initial = initial, title = title, onDismiss = onDismiss, onConfirm = onSave)
 }
 @Composable private fun SettingRow(label: String, value: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).heightIn(min = 56.dp).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {

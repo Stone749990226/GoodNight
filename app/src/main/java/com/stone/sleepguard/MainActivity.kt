@@ -117,10 +117,9 @@ class MainActivity : ComponentActivity() {
                                     onReason = { id, text -> runAction { app.repository.reason(id, text) } },
                                     onFeeling = { feelingId = it }, onPhoto = { photo(it) },
                                     onShare = { id -> share(records.filter { it.night.id == id }) }, onPermissions = { tab = 2 }, permissionTick = tick, context = this@MainActivity)
-                                1 -> RecordsScreen(records, preferences, { feelingId = it }, { photo(it) }, { share(it) }, { id, text -> runAction { app.repository.reason(id, text) } },
+                                1 -> RecordsScreen(records, { feelingId = it }, { photo(it) }, { share(it) }, { id, text -> runAction { app.repository.reason(id, text) } },
                                     onEdit = { id, edit -> runAction { app.repository.edit(id, edit) } },
                                     onDelete = { id -> runAction { app.repository.deleteNight(id)?.let { deleted = it } } },
-                                    onEditTargets = { tab = 2 },
                                     scrollState = pageScroll)
                                 else -> SettingsScreen(preferences, tick, this@MainActivity,
                                     onSave = { value -> runAction { app.preferences.save(value) } },
@@ -196,15 +195,7 @@ class MainActivity : ComponentActivity() {
     companion object { @Volatile var visible = false }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun NightWakeDialog(initial: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
-    val state = rememberTimePickerState(initialHour = initial / 60, initialMinute = initial % 60, is24Hour = true)
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("今晚，几点醒？") }, text = {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("给自己一个起床约定", color = Muted, fontSize = 12.sp)
-            TimePicker(state = state)
-        }
-    }, confirmButton = { TextButton(onClick = { onConfirm(state.hour * 60 + state.minute) }) { Text("开始晚安") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-        containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
+    WheelTimeDialog(initial = initial, title = "今晚，几点醒？", subtitle = "给自己一个起床约定",
+        confirmLabel = "开始晚安", onDismiss = onDismiss, onConfirm = onConfirm)
 }

@@ -3,7 +3,6 @@ package com.stone.sleepguard
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -16,8 +15,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.*
 import java.time.Instant
 import java.time.LocalDate
@@ -38,9 +35,9 @@ private fun Long.toUtcDate(): LocalDate = Instant.ofEpochMilli(this).atZone(Zone
 private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable internal fun RecordsScreen(records: List<NightRecord>, settings: SleepSettings, onFeeling: (Long) -> Unit, onPhoto: (Long) -> Unit,
+@Composable internal fun RecordsScreen(records: List<NightRecord>, onFeeling: (Long) -> Unit, onPhoto: (Long) -> Unit,
     onShare: (List<NightRecord>) -> Unit, onReason: (Long, String) -> Unit,
-    onEdit: (Long, NightEdit) -> Unit, onDelete: (Long) -> Unit, onEditTargets: () -> Unit, scrollState: ScrollState) {
+    onEdit: (Long, NightEdit) -> Unit, onDelete: (Long) -> Unit, scrollState: ScrollState) {
     SectionLabel("每一晚", "YOUR RHYTHM")
     Text("看看时间，也记得看看自己。", color = Muted, fontSize = 13.sp)
     var days by rememberSaveable { mutableIntStateOf(7) }
@@ -63,14 +60,6 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
             Metric("平均就寝", stats.averageBed, Modifier.weight(1f)); Metric("平均醒来", stats.averageWake, Modifier.weight(1f)); Metric("达标率", stats.rate?.let { "$it%" } ?: "—", Modifier.weight(1f))
         }
         Text("${stats.total} 晚记录 · ${stats.valid} 晚有效；缺失、未完成、监控中断及超过时长上限的记录不参与平均。", fontSize = 11.sp, color = Muted, lineHeight = 18.sp)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("达标对比", fontSize = 10.sp, color = Muted)
-                Text("${minutesText(settings.targetBed)} 放下手机 · ${minutesText(settings.targetWake)} 起床", fontSize = 13.sp, color = Cream)
-            }
-            TextButton(onClick = onEditTargets) { Text("修改", color = Mint) }
-        }
-        Text("当晚就寝和起床都不晚于目标才算达标；历史记录按各自当天的目标计算。", fontSize = 10.sp, color = Muted, lineHeight = 15.sp)
         Trend(selected)
     }
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -223,28 +212,19 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
 }
 
 @Composable private fun EditNightDialog(record: NightRecord, onSave: (NightEdit) -> Unit, onDismiss: () -> Unit) {
-    var bedText by remember(record.night.id) { mutableStateOf(clock(record.night.lastSleepAt)) }
-    var wakeText by remember(record.night.id) { mutableStateOf(clock(record.night.wakeAt)) }
+    var bedMinutes by remember(record.night.id) { mutableIntStateOf(localMinutes(record.night.lastSleepAt)) }
+    var wakeMinutes by remember(record.night.id) { mutableIntStateOf(record.night.wakeAt?.let { localMinutes(it) } ?: record.night.targetWake) }
+    var editing by remember { mutableStateOf<String?>(null) }
     var reasons by remember(record.night.id) { mutableStateOf(record.disruptions.associate { it.id to (it.reason ?: "") }) }
     var removed by remember(record.night.id) { mutableStateOf(emptySet<Long>()) }
-    val bedMinutes = parseClock(bedText)
-    val wakeMinutes = parseClock(wakeText)
-    val bedAt = bedMinutes?.let { bedTimestamp(record.night.date, it) }
-    val wakeAt = wakeMinutes?.let { wakeTimestamp(record.night.date, it) }
-    val error = when {
-        bedMinutes == null || bedAt == null -> "就寝时间写成 23:30 这样"
-        wakeMinutes == null || wakeAt == null -> "醒来时间写成 07:00 这样"
-        wakeAt <= bedAt -> "醒来时间需要晚于就寝时间"
-        else -> null
-    }
+    val bedAt = bedTimestamp(record.night.date, bedMinutes)
+    val wakeAt = wakeTimestamp(record.night.date, wakeMinutes)
+    val error = if (wakeAt <= bedAt) "醒来时间需要晚于就寝时间" else null
     AlertDialog(onDismissRequest = onDismiss, title = { Text("编辑 ${record.night.date} 晚") }, text = {
         Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("时间按这一晚的日期换算；中午之前的就寝视为次日凌晨。", fontSize = 12.sp, color = Muted, lineHeight = 18.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(value = bedText, onValueChange = { if (it.length <= 5) bedText = it }, label = { Text("最终就寝") }, singleLine = true,
-                    modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next))
-                OutlinedTextField(value = wakeText, onValueChange = { if (it.length <= 5) wakeText = it }, label = { Text("点击醒了") }, singleLine = true,
-                    modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done))
+                TimeField("最终就寝", minutesText(bedMinutes), Modifier.weight(1f)) { editing = "bed" }
+                TimeField("点击醒了", minutesText(wakeMinutes), Modifier.weight(1f)) { editing = "wake" }
             }
             val visible = record.disruptions.filterNot { it.id in removed }
             if (visible.isNotEmpty()) {
@@ -261,16 +241,29 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
                 }
             }
             if (removed.isNotEmpty()) Text("已标记移除 ${removed.size} 次误报中断，保存后生效。", fontSize = 11.sp, color = Amber)
-            if (bedAt != null && wakeAt != null && wakeAt - bedAt > record.night.maxSleepMinutes * 60_000L)
+            if (wakeAt - bedAt > record.night.maxSleepMinutes * 60_000L)
                 Text("这次超过设定的 ${record.night.maxSleepMinutes / 60} 小时，保存后不计入平均。", fontSize = 11.sp, color = Amber)
             Text("若就寝时间晚于某次中断，这一晚将显示为未完成，不参与作息平均。", fontSize = 11.sp, color = Muted, lineHeight = 17.sp)
             error?.let { Text(it, color = Amber, fontSize = 12.sp) }
         }
     }, confirmButton = {
-        TextButton(enabled = error == null, onClick = {
-            if (bedAt != null && wakeAt != null) onSave(NightEdit(bedAt, wakeAt, reasons.filterKeys { it !in removed }, removed))
-        }) { Text("保存修改") }
+        TextButton(enabled = error == null, onClick = { onSave(NightEdit(bedAt, wakeAt, reasons.filterKeys { it !in removed }, removed)) }) { Text("保存修改") }
     }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
+    when (editing) {
+        "bed" -> WheelTimeDialog(initial = bedMinutes, title = "最终就寝", onDismiss = { editing = null }) { bedMinutes = it; editing = null }
+        "wake" -> WheelTimeDialog(initial = wakeMinutes, title = "点击醒了", onDismiss = { editing = null }) { wakeMinutes = it; editing = null }
+    }
+}
+
+@Composable private fun TimeField(label: String, value: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xFF1C2D38)).clickable(onClick = onClick)
+        .padding(vertical = 10.dp, horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(label, fontSize = 11.sp, color = Muted)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(value, fontSize = 20.sp, color = Cream, modifier = Modifier.weight(1f))
+            Text("›", color = Mint, fontSize = 16.sp)
+        }
+    }
 }
 
 @Composable private fun DeleteNightDialog(record: NightRecord, onConfirm: () -> Unit, onDismiss: () -> Unit) {
