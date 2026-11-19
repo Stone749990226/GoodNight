@@ -39,7 +39,6 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
     onShare: (List<NightRecord>) -> Unit, onReason: (Long, String) -> Unit,
     onEdit: (Long, NightEdit) -> Unit, onDelete: (Long) -> Unit, scrollState: ScrollState) {
     SectionLabel("每一晚", "YOUR RHYTHM")
-    Text("看看时间，也记得看看自己。", color = Muted, fontSize = 13.sp)
     var days by rememberSaveable { mutableIntStateOf(7) }
     var fromDay by rememberSaveable { mutableStateOf<Long?>(null) }
     var toDay by rememberSaveable { mutableStateOf<Long?>(null) }
