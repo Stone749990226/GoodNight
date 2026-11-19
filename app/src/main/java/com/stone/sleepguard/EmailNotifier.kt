@@ -11,16 +11,17 @@ object EmailNotifier {
 
     fun sleep(context: Context, record: NightRecord, again: Boolean) = dispatch(context) { config, role ->
         val name = roleName(role)
+        val partner = partnerName(role)
         val at = record.night.lastSleepAt
-        if (again) Payload("SLEEP_AGAIN", "🌙 $name 再次说晚安 · ${clock(at)}", """
-            $name 在 ${clock(at)} 再次说晚安。
+        if (again) Payload("SLEEP_AGAIN", "🌙 ${name}再次说${partner}晚安 💤 mua 💞", """
+            $name 在 ${clock(at)} 再次和 $partner 说晚安。
             上次拿起的原因：${record.disruptions.lastOrNull()?.reason ?: "—"}。
             重新开始守候。
 
             —— 晚安 🫶
         """.trimIndent())
-        else Payload("SLEEP", "🌙 $name 说晚安了 · ${clock(at)}", """
-            $name 在 ${clock(at)} 说要睡了。
+        else Payload("SLEEP", "🌙 ${name}说${partner}晚安 💤 mua 💞", """
+            $name 在 ${clock(at)} 和 $partner 说晚安。
             今晚目标起床：${minutesText(record.night.targetWake)}。
             已经开始守候，半夜拿起手机会记录并通知你。
 
@@ -39,6 +40,7 @@ object EmailNotifier {
 
     fun wake(context: Context, record: NightRecord) = dispatch(context) { config, role ->
         val name = roleName(role)
+        val partner = partnerName(role)
         val wake = record.night.wakeAt ?: return@dispatch null
         val lines = record.interruptions.sortedBy { it.detectedAt }.joinToString("\n") { i ->
             val reason = if (i.morning) "起床操作" else (i.reason ?: "原因待补充")
@@ -51,8 +53,8 @@ object EmailNotifier {
                 localMinutes(wake) <= record.night.targetWake -> "达标"
             else -> "未达标"
         }
-        Payload("WAKE", "☀️ $name 醒了 · ${clock(wake)}", """
-            $name 在 ${clock(wake)} 点了我醒了。
+        Payload("WAKE", "☀️ ${name}说${partner}早安", """
+            $name 在 ${clock(wake)} 和 $partner 说早安。
             最终就寝：${clock(record.finalBedAt)}
             记录间隔：${intervalText(record.interval)}
             夜间中断：${record.disruptions.size} 次
@@ -60,13 +62,14 @@ object EmailNotifier {
             目标：${minutesText(record.night.targetBed)} 放下手机 / ${minutesText(record.night.targetWake)} 起床
             结果：$result
 
-            —— 早安，${partnerName(role)} ☀️
+            —— 早安，$partner ☀️
         """.trimIndent())
     }
 
     fun missedWake(context: Context, record: NightRecord, now: Long = System.currentTimeMillis()) = dispatch(context) { config, role ->
-        Payload("MISSED_WAKE", "☀️ ${roleName(role)} 还没点我醒了 · ${clock(now)}", """
-            到了 ${clock(now)}，${roleName(role)} 还没有点我醒了。
+        val name = roleName(role)
+        Payload("MISSED_WAKE", "😴 ${name}睡过头了", """
+            到了 ${clock(now)}，$name 睡过头了。
             昨晚仍在守候；目标起床：${minutesText(record.night.targetWake)}。
 
             —— 早安，${partnerName(role)} ☀️
@@ -74,9 +77,10 @@ object EmailNotifier {
     }
 
     fun overslept(context: Context, record: NightRecord) = dispatch(context) { config, role ->
+        val name = roleName(role)
         val hours = record.night.maxSleepMinutes / 60
-        Payload("OVERSLEPT", "☀️ ${roleName(role)} 超过 $hours 小时还没醒", """
-            ${roleName(role)} 已经超过 $hours 小时没有点我醒了，守候仍在继续。
+        Payload("OVERSLEPT", "😴 ${name}睡过头了 · 超过 $hours 小时", """
+            $name 已经超过 $hours 小时还没有和 ${partnerName(role)} 说早安，守候仍在继续。
             这一晚会计为超长，不计入平均。
 
             —— 早安，${partnerName(role)} ☀️
@@ -108,3 +112,4 @@ object EmailNotifier {
         }
     }
 }
+

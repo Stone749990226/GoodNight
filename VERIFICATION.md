@@ -98,6 +98,14 @@
 - 事件邮件发送成功后用 Android Toast 提示「邮件已发送给 {对方}」；一次发送多封时提示数量。测试邮件也有 Toast。
 - 0.9.3（versionCode 13）已安装到 vivo X100s Pro；`testDebugUnitTest` 12 项、`lintDebug`、`assembleDebug` 通过。手机尚未录入邮件配置，Toast 发信提示留待配置后实测。
 
+## 0.9.4 邮件标题改为情侣口吻
+
+- 说晚安标题：`🌙 Stone说Fanny晚安 💤 mua 💞`；再次晚安：`🌙 Stone再次说Fanny晚安 💤 mua 💞`。
+- 醒来标题：`☀️ Stone说Fanny早安`；正文改为「Stone 在 07:26 和 Fanny 说早安」。
+- 超时未醒标题：`😴 Stone睡过头了`；超过最长时长：`😴 Stone睡过头了 · 超过 10 小时`。
+- 全部按身份自动反转：Fanny 手机上显示 Fanny说Stone晚安 / Fanny说Stone早安 / Fanny睡过头了。
+- 0.9.4（versionCode 14）已安装到 vivo X100s Pro；`testDebugUnitTest` 12 项、`lintDebug`、`assembleDebug` 通过。
+
 ## 用户实测与验收范围调整
 
 - 用户已在 vivo 上亲自测试拿起/倾斜检测，并明确将此检查视为完成。
