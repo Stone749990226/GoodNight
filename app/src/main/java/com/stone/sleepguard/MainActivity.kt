@@ -137,7 +137,7 @@ class MainActivity : ComponentActivity() {
                                 else -> SettingsScreen(preferences, email, role, tick, this@MainActivity,
                                     onSave = { value -> runAction { app.preferences.save(value) } },
                                     onSaveEmail = { value -> runAction { app.emailPreferences.save(value) } },
-                                    onTestEmail = { runAction { app.emailSender.sendTest(); app.message.value = "测试邮件已发送" } },
+                                    onTestEmail = { runAction { app.emailSender.sendTest() } },
                                     onNotifications = { if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                                         else openSettings(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) },
                                     onOverlay = { openSettings(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) },

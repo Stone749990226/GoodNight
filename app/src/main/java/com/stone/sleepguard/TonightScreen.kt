@@ -93,7 +93,7 @@ internal fun TonightScreen(active: NightRecord?, lastAwake: NightRecord?, now: L
                 TextButton(onClick = { onFeeling(lastAwake.night.id) }) { Text(lastAwake.night.feeling ?: "补充感受") }
                 TextButton(onClick = { onPhoto(lastAwake.night.id) }) { Text(if (lastAwake.night.photo == null) "拍张户外照片" else "重新拍照") }
             }
-            OutlinedButton(onClick = { onShare(lastAwake.night.id) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("预览并分享给朋友") }
+            OutlinedButton(onClick = { onShare(lastAwake.night.id) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("预览并分享给 $partner") }
         }
     }
 }

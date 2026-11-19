@@ -1,6 +1,9 @@
 package com.stone.sleepguard
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import androidx.work.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -37,17 +40,20 @@ class EmailSender(private val context: Context) {
         SendLock.mutex.withLock {
             val config = preferences.flow.first()
             if (!config.enabled || !config.configured) return@withLock
+            val partner = partnerName(app.rolePreferences.flow.first().role)
             dao.resetSendingEmails()
+            var sent = 0
             dao.pendingEmails().forEach { job ->
                 if (dao.claimEmail(job.id) == 0) return@forEach
                 runCatching { send(config, job.subject, job.body) }
-                    .onSuccess { dao.markEmailSent(job.id) }
+                    .onSuccess { dao.markEmailSent(job.id); sent++ }
                     .onFailure { error ->
                         val failed = job.attempts + 1 >= 8
                         dao.markEmailFailed(job.id, if (failed) EmailStatus.FAILED else EmailStatus.PENDING,
                             error.message ?: error.javaClass.simpleName)
                     }
             }
+            if (sent > 0) toast(if (sent == 1) "邮件已发送给 $partner" else "已发送 $sent 封邮件给 $partner")
         }
     }
 
@@ -57,6 +63,11 @@ class EmailSender(private val context: Context) {
         val config = preferences.flow.first()
         check(config.configured) { "请先填写发件邮箱、授权码和对方邮箱" }
         send(config, "🌙 晚安 · 邮件自测", "这是一封测试邮件。\n\n事件邮件会从 ${config.from} 发到 ${config.partner}。")
+        toast("测试邮件已发送给 ${partnerName(app.rolePreferences.flow.first().role)}")
+    }
+
+    private fun toast(text: String) {
+        Handler(Looper.getMainLooper()).post { Toast.makeText(context.applicationContext, text, Toast.LENGTH_SHORT).show() }
     }
 
     private fun send(config: EmailSettings, subject: String, body: String) {

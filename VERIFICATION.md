@@ -92,6 +92,12 @@
 - 0.9.2：分享图落款从「晚安 · 分享给关心我的人」改为「晚安，分享给 {对方}」；Stone 手机生成 Fanny，Fanny 手机生成 Stone。
 - 0.9.2（versionCode 12）已安装到 vivo X100s Pro；确认首页目标为 00:15 / 08:30，按钮为「和 Fanny 说晚安 💤 mua 💞」；`testDebugUnitTest` 12 项、`lintDebug`、`assembleDebug` 通过。
 
+## 0.9.3 分享按钮与发送提示
+
+- 首页「预览并分享给朋友」改为「预览并分享给 {对方}」；Stone 手机为 Fanny，Fanny 手机为 Stone。
+- 事件邮件发送成功后用 Android Toast 提示「邮件已发送给 {对方}」；一次发送多封时提示数量。测试邮件也有 Toast。
+- 0.9.3（versionCode 13）已安装到 vivo X100s Pro；`testDebugUnitTest` 12 项、`lintDebug`、`assembleDebug` 通过。手机尚未录入邮件配置，Toast 发信提示留待配置后实测。
+
 ## 用户实测与验收范围调整
 
 - 用户已在 vivo 上亲自测试拿起/倾斜检测，并明确将此检查视为完成。
