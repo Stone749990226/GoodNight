@@ -38,9 +38,9 @@ private fun Long.toUtcDate(): LocalDate = Instant.ofEpochMilli(this).atZone(Zone
 private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable internal fun RecordsScreen(records: List<NightRecord>, onFeeling: (Long) -> Unit, onPhoto: (Long) -> Unit,
+@Composable internal fun RecordsScreen(records: List<NightRecord>, settings: SleepSettings, onFeeling: (Long) -> Unit, onPhoto: (Long) -> Unit,
     onShare: (List<NightRecord>) -> Unit, onReason: (Long, String) -> Unit,
-    onEdit: (Long, NightEdit) -> Unit, onDelete: (Long) -> Unit, scrollState: ScrollState) {
+    onEdit: (Long, NightEdit) -> Unit, onDelete: (Long) -> Unit, onEditTargets: () -> Unit, scrollState: ScrollState) {
     SectionLabel("每一晚", "YOUR RHYTHM")
     Text("看看时间，也记得看看自己。", color = Muted, fontSize = 13.sp)
     var days by rememberSaveable { mutableIntStateOf(7) }
@@ -62,7 +62,15 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Metric("平均就寝", stats.averageBed, Modifier.weight(1f)); Metric("平均醒来", stats.averageWake, Modifier.weight(1f)); Metric("达标率", stats.rate?.let { "$it%" } ?: "—", Modifier.weight(1f))
         }
-        Text("${stats.total} 晚记录 · ${stats.valid} 晚有效；缺失、未完成及监控中断记录不参与平均。", fontSize = 11.sp, color = Muted, lineHeight = 18.sp)
+        Text("${stats.total} 晚记录 · ${stats.valid} 晚有效；缺失、未完成、监控中断及超过时长上限的记录不参与平均。", fontSize = 11.sp, color = Muted, lineHeight = 18.sp)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("达标对比", fontSize = 10.sp, color = Muted)
+                Text("${minutesText(settings.targetBed)} 放下手机 · ${minutesText(settings.targetWake)} 起床", fontSize = 13.sp, color = Cream)
+            }
+            TextButton(onClick = onEditTargets) { Text("修改", color = Mint) }
+        }
+        Text("当晚就寝和起床都不晚于目标才算达标；历史记录按各自当天的目标计算。", fontSize = 10.sp, color = Muted, lineHeight = 15.sp)
         Trend(selected)
     }
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -147,7 +155,7 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
         records.forEach { r ->
             HorizontalDivider(color = Color(0xFF2B3C46))
             Row(Modifier.fillMaxWidth().clickable { onSelect(r.night.id) }) {
-                listOf(r.night.date.drop(5), clock(r.night.firstSleepAt), clock(r.finalBedAt), clock(r.night.wakeAt), "${r.disruptions.size}", intervalText(r.interval), r.night.feeling ?: "待补充").forEachIndexed { index, value ->
+                listOf(r.night.date.drop(5), clock(r.night.firstSleepAt), clock(r.finalBedAt), clock(r.night.wakeAt), "${r.disruptions.size}", intervalText(r.interval) + if (r.overslept) "·超长" else "", r.night.feeling ?: "待补充").forEachIndexed { index, value ->
                     Text(value, Modifier.cell(), fontSize = 12.sp, color = if (index == 0) Mint else Cream)
                 }
             }
@@ -166,6 +174,7 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
             Text(if (expanded) "收起 −" else "展开 +", color = Mint, fontSize = 12.sp)
         }
         if (record.hasGap) Text("包含监控缺口，未计入作息平均。", color = Amber, fontSize = 12.sp)
+        if (record.overslept) Text("超过设定的最多睡眠时长（${record.night.maxSleepMinutes / 60} 小时），未计入平均。", color = Amber, fontSize = 12.sp)
         if (expanded) {
             HorizontalDivider(color = Color(0xFF30424C))
             Text("首次晚安 ${clock(record.night.firstSleepAt)}\n最终就寝 ${clock(record.finalBedAt)}（本人声明）\n末次灭屏 ${clock(record.lastScreenOff)} · 晨起解锁参考 ${clock(record.morningUnlock)}\n记录间隔 ${intervalText(record.interval)}", color = Muted, fontSize = 13.sp, lineHeight = 24.sp)
@@ -252,6 +261,8 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
                 }
             }
             if (removed.isNotEmpty()) Text("已标记移除 ${removed.size} 次误报中断，保存后生效。", fontSize = 11.sp, color = Amber)
+            if (bedAt != null && wakeAt != null && wakeAt - bedAt > record.night.maxSleepMinutes * 60_000L)
+                Text("这次超过设定的 ${record.night.maxSleepMinutes / 60} 小时，保存后不计入平均。", fontSize = 11.sp, color = Amber)
             Text("若就寝时间晚于某次中断，这一晚将显示为未完成，不参与作息平均。", fontSize = 11.sp, color = Muted, lineHeight = 17.sp)
             error?.let { Text(it, color = Amber, fontSize = 12.sp) }
         }

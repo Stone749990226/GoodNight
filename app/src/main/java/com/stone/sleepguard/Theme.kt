@@ -20,7 +20,12 @@ internal val Muted = Color(0xFF9FB2B9)
 internal val Mint = Color(0xFFA8DCCB)
 internal val Amber = Color(0xFFE7C38D)
 @Composable fun NightTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = darkColorScheme(primary = Mint, onPrimary = Ink, secondary = Amber, onSecondary = Ink,
+    MaterialTheme(colorScheme = darkColorScheme(primary = Mint, onPrimary = Ink,
+        primaryContainer = Color(0xFF2B4B46), onPrimaryContainer = Cream,
+        secondary = Amber, onSecondary = Ink,
+        secondaryContainer = Color(0xFF2B4B46), onSecondaryContainer = Cream,
+        tertiary = Amber, onTertiary = Ink,
+        tertiaryContainer = Color(0xFF3B3225), onTertiaryContainer = Amber,
         background = Ink, onBackground = Cream, surface = Panel, onSurface = Cream,
         surfaceVariant = Color(0xFF1C2D38), onSurfaceVariant = Muted, outline = Color(0xFF3B505C),
         error = Color(0xFFF2ACA5), onError = Ink)) {

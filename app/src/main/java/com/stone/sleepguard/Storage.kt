@@ -7,6 +7,8 @@ import android.os.BatteryManager
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -37,17 +39,26 @@ interface SleepDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun restoreEvent(event: NightEvent)
 }
 
-@Database(entities = [Night::class, Interruption::class, NightEvent::class], version = 1, exportSchema = false)
+@Database(entities = [Night::class, Interruption::class, NightEvent::class], version = 2, exportSchema = false)
 abstract class SleepDatabase : RoomDatabase() { abstract fun dao(): SleepDao }
 
+private val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE nights ADD COLUMN maxSleepMinutes INTEGER NOT NULL DEFAULT 600")
+    }
+}
+
 private val Context.settingsStore by preferencesDataStore("settings")
-data class SleepSettings(val targetBed: Int = 1410, val targetWake: Int = 450)
+data class SleepSettings(val targetBed: Int = 1410, val targetWake: Int = 450, val maxSleepHours: Int = 10)
 class SleepPreferences(context: Context) {
     private val store = context.settingsStore
     private val bed = intPreferencesKey("bed")
     private val wake = intPreferencesKey("wake")
-    val flow = store.data.map { SleepSettings(it[bed] ?: 1410, it[wake] ?: 450) }
-    suspend fun save(value: SleepSettings) { store.edit { it[bed] = value.targetBed; it[wake] = value.targetWake } }
+    private val maxSleep = intPreferencesKey("maxSleepHours")
+    val flow = store.data.map { SleepSettings(it[bed] ?: 1410, it[wake] ?: 450, it[maxSleep] ?: 10) }
+    suspend fun save(value: SleepSettings) {
+        store.edit { it[bed] = value.targetBed; it[wake] = value.targetWake; it[maxSleep] = value.maxSleepHours }
+    }
 }
 
 data class PowerStatus(val plugged: Boolean, val charging: Boolean, val percent: Int) {
@@ -65,7 +76,7 @@ fun powerStatus(context: Context): PowerStatus {
 }
 
 class SleepRepository(private val context: Context) {
-    private val db = Room.databaseBuilder(context, SleepDatabase::class.java, "sleep.db").build()
+    private val db = Room.databaseBuilder(context, SleepDatabase::class.java, "sleep.db").addMigrations(MIGRATION_1_2).build()
     val dao = db.dao()
     private val mutex = Mutex()
     val records = dao.observeRecords()
@@ -78,9 +89,10 @@ class SleepRepository(private val context: Context) {
             check(current?.pending == null) { "请先填写这次拿起手机的原因" }
             val id = if (current == null) dao.insert(Night(date = nightDate(now), firstSleepAt = now,
                 lastSleepAt = now, targetBed = settings.targetBed, targetWake = settings.targetWake,
-                armedAt = now + 15_000)) else {
+                armedAt = now + 15_000, maxSleepMinutes = settings.maxSleepHours * 60)) else {
                 current.interruptions.filter { !it.morning && it.returnedAt == null }.forEach { dao.update(it.copy(returnedAt = now)) }
-                dao.update(current.night.copy(lastSleepAt = now, phase = Phase.SETTLING, armedAt = now + 15_000, heartbeatAt = now))
+                dao.update(current.night.copy(lastSleepAt = now, phase = Phase.SETTLING, armedAt = now + 15_000, heartbeatAt = now,
+                    maxSleepMinutes = settings.maxSleepHours * 60))
                 current.night.id
             }
             dao.insert(NightEvent(nightId = id, at = now, type = "SLEEP", detail = "本人点击我去睡了；15秒后开始检测"))

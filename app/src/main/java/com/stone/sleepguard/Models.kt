@@ -37,6 +37,7 @@ data class Night(
     val feeling: String? = null,
     val photo: String? = null,
     val heartbeatAt: Long = firstSleepAt,
+    @ColumnInfo(defaultValue = "600") val maxSleepMinutes: Int = 600,
 )
 
 @Entity(tableName = "interruptions", foreignKeys = [ForeignKey(entity = Night::class,
@@ -70,7 +71,8 @@ data class NightRecord(
     val pending get() = disruptions.lastOrNull { it.reason.isNullOrBlank() }
     val finalBedAt: Long? get() = night.lastSleepAt.takeIf { t -> disruptions.none { it.detectedAt >= t } }
     val hasGap get() = events.any { it.type == "GAP" }
-    val valid get() = night.wakeAt != null && finalBedAt != null && !hasGap
+    val overslept get() = interval?.let { it > night.maxSleepMinutes.coerceAtLeast(60) * 60_000L } == true
+    val valid get() = night.wakeAt != null && finalBedAt != null && !hasGap && !overslept
     val interval: Long? get() = finalBedAt?.let { bed -> night.wakeAt?.let { (it - bed).coerceAtLeast(0) } }
     val lastScreenOff get() = events.filter { it.type == "SCREEN_OFF" && it.at >= night.lastSleepAt && it.at <= (night.wakeAt ?: Long.MAX_VALUE) }.maxByOrNull { it.at }?.at
     val morningUnlock get() = night.wakeAt?.let { wake -> events.filter { it.type == "UNLOCK" && it.at in (wake - 300_000)..wake }.maxByOrNull { it.at }?.at }

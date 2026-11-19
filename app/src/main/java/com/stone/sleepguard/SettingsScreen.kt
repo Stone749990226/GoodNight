@@ -7,13 +7,13 @@ import android.os.*
 import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
 import kotlinx.coroutines.delay
 
@@ -22,19 +22,17 @@ import kotlinx.coroutines.delay
     onDiagnostic: () -> Unit, onExport: () -> Unit) {
     SectionLabel("按你的节奏", "PREFERENCES")
     var editBed by remember { mutableStateOf(false) }; var editWake by remember { mutableStateOf(false) }
+    var editMaxSleep by remember { mutableStateOf(false) }
     SoftCard {
         Text("目标作息", fontSize = 17.sp, color = Cream)
         SettingRow("放下手机", minutesText(settings.targetBed)) { editBed = true }
         SettingRow("起床时间", minutesText(settings.targetWake)) { editWake = true }
-        Text("修改只影响之后开始的夜晚，保留每一晚自己的目标。", fontSize = 12.sp, color = Muted, lineHeight = 20.sp)
+        SettingRow("最多睡眠时长", "${settings.maxSleepHours} 小时") { editMaxSleep = true }
+        Text("超过这个时长还没点我醒了，就不会计入平均。", fontSize = 12.sp, color = Muted, lineHeight = 20.sp)
     }
     SoftCard {
         Text("移动检测", fontSize = 17.sp, color = Cream)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("灵敏度", fontSize = 14.sp, color = Cream)
-            Text("固定为高", fontSize = 13.sp, color = Mint)
-        }
-        Text("倾斜超过 12° 持续 0.5 秒，或移动超过 1.0 m/s² 持续 0.3 秒就会记录。不可调整，可自测确认。", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
+        Text("拿起或明显移动手机时会留下记录。可以先自测确认一次。", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
         OutlinedButton(onClick = onDiagnostic, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("拿起检测自测") }
     }
     val notifications = remember(tick) { context.getSystemService(NotificationManager::class.java).areNotificationsEnabled() }
@@ -55,25 +53,43 @@ import kotlinx.coroutines.delay
     }
     if (editBed) EditTimeDialog(settings.targetBed, "几点放下手机", { editBed = false }) { onSave(settings.copy(targetBed = it)); editBed = false }
     if (editWake) EditTimeDialog(settings.targetWake, "几点起床", { editWake = false }) { onSave(settings.copy(targetWake = it)); editWake = false }
+    if (editMaxSleep) MaxSleepDialog(settings.maxSleepHours, { editMaxSleep = false }) { onSave(settings.copy(maxSleepHours = it)); editMaxSleep = false }
+}
+@Composable private fun MaxSleepDialog(initial: Int, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
+    var hours by remember { mutableIntStateOf(initial) }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("最多睡多久") }, text = {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedButton(onClick = { hours = (hours - 1).coerceAtLeast(4) }, shape = CircleShape,
+                    contentPadding = PaddingValues(0.dp), modifier = Modifier.size(54.dp)) { Text("−", fontSize = 24.sp) }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("$hours", fontSize = 44.sp, color = Mint, fontWeight = FontWeight.Light)
+                    Text("小时", fontSize = 12.sp, color = Muted)
+                }
+                OutlinedButton(onClick = { hours = (hours + 1).coerceAtMost(16) }, shape = CircleShape,
+                    contentPadding = PaddingValues(0.dp), modifier = Modifier.size(54.dp)) { Text("+", fontSize = 24.sp) }
+            }
+            Text("超过这个时长还没点我醒了，就不计入平均。", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+        }
+    }, confirmButton = { TextButton(onClick = { onSave(hours) }) { Text("保存") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable private fun EditTimeDialog(initial: Int, title: String, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
+    val state = rememberTimePickerState(initialHour = initial / 60, initialMinute = initial % 60, is24Hour = true)
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, text = { TimePicker(state = state) },
+        confirmButton = { TextButton(onClick = { onSave(state.hour * 60 + state.minute) }) { Text("保存") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
 }
 @Composable private fun SettingRow(label: String, value: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).heightIn(min = 56.dp).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, fontSize = 14.sp, color = Cream, modifier = Modifier.weight(1f)); Text("$value  ›", fontSize = 13.sp, color = Mint)
     }
 }
-@Composable private fun EditTimeDialog(initial: Int, title: String, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
-    var value by remember { mutableStateOf(minutesText(initial)) }
-    val parsed = value.split(':').takeIf { it.size == 2 }?.let {
-        val h = it[0].toIntOrNull(); val m = it[1].toIntOrNull()
-        if (h != null && h in 0..23 && m != null && m in 0..59) h * 60 + m else null
-    }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, text = {
-        OutlinedTextField(value = value, onValueChange = { value = it }, label = { Text("24小时制，例如 23:30") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii))
-    }, confirmButton = { TextButton(enabled = parsed != null, onClick = { parsed?.let(onSave) }) { Text("保存") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
-}
 @Composable internal fun DiagnosticDialog(context: Context, onDismiss: () -> Unit) {
     var count by remember { mutableIntStateOf(0) }
-    var reading by remember { mutableStateOf("等待传感器") }
     var lastResult by remember { mutableStateOf("还没有检测到动作。") }
     var round by remember { mutableIntStateOf(0) }
     var countdown by remember { mutableIntStateOf(3) }
@@ -89,11 +105,10 @@ import kotlinx.coroutines.delay
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
             override fun onSensorChanged(event: SensorEvent) {
                 val t = event.timestamp / 1_000_000
-                reading = "X ${"%.1f".format(event.values[0])}   Y ${"%.1f".format(event.values[1])}   Z ${"%.1f".format(event.values[2])}"
                 val result = detector.sample(event.values[0], event.values[1], event.values[2], t, t >= baselineUntil)
                 if (result != null) {
                     count++
-                    lastResult = "$result · 已记为一次活动"
+                    lastResult = "检测到一次动作，已计入自测。"
                     detector = MotionDetector()
                     baselineUntil = t + 3000
                     round++
@@ -110,10 +125,9 @@ import kotlinx.coroutines.delay
                 Text("已检测 $count 次", color = Mint, fontSize = 26.sp, modifier = Modifier.weight(1f))
                 if (countdown > 0) Text("$countdown", color = Amber, fontSize = 44.sp)
             }
-            Text(if (countdown > 0) "静置 $countdown 秒，倒计时结束后再拿起手机" else "现在拿起手机，看看会不会记为一次活动", color = Cream, lineHeight = 22.sp)
+            Text(if (countdown > 0) "静置 $countdown 秒，倒计时结束后再拿起手机" else "现在拿起手机，看看会不会记为一次动作", color = Cream, lineHeight = 22.sp)
             Text(lastResult, color = Cream, fontSize = 13.sp)
-            Text(reading, color = Muted, fontSize = 12.sp)
-            Text("固定为高灵敏度：倾斜超过 12° 持续 0.5 秒，或移动超过 1.0 m/s² 持续 0.3 秒。这是前台自测，不会写入夜间记录。", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+            Text("只是自测，不会写入夜间记录。", color = Muted, fontSize = 12.sp)
         }
     }, confirmButton = { TextButton(onClick = onDismiss) { Text("完成") } })
 }

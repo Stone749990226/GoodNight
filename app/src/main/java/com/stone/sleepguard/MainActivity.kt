@@ -58,6 +58,8 @@ class MainActivity : ComponentActivity() {
                 val snackbar = remember { SnackbarHostState() }
                 var tab by rememberSaveable { mutableIntStateOf(0) }
                 var feelingId by rememberSaveable { mutableStateOf<Long?>(null) }
+                var morningPrompt by rememberSaveable { mutableStateOf(false) }
+                var wakeDialog by rememberSaveable { mutableStateOf(false) }
                 var diagnostic by remember { mutableStateOf(false) }
                 var exportRange by remember { mutableStateOf(false) }
                 var deleted by remember { mutableStateOf<NightRecord?>(null) }
@@ -77,10 +79,18 @@ class MainActivity : ComponentActivity() {
                     deleted = null
                 }
                 LaunchedEffect(records, tick) {
+                    if (intent.getBooleanExtra("wakePrompt", false)) {
+                        morningPrompt = true
+                        intent.removeExtra("wakePrompt")
+                        MonitorService.dismissMorningPrompt()
+                    }
                     if (intent.getBooleanExtra("feeling", false) && records.isNotEmpty()) {
                         feelingId = records.firstOrNull { it.night.phase == Phase.AWAKE && it.night.feeling == null }?.night?.id
                         intent.removeExtra("feeling")
                     }
+                }
+                val wakeNow: () -> Unit = {
+                    runAction { MonitorService.releaseNow(); stopService(Intent(this@MainActivity, MonitorService::class.java)); feelingId = app.repository.wake() }
                 }
                 val active = records.firstOrNull { it.night.phase != Phase.AWAKE }
                 val lastAwake = records.firstOrNull { it.night.phase == Phase.AWAKE }
@@ -99,14 +109,18 @@ class MainActivity : ComponentActivity() {
                         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(pageScroll).padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             when (tab) {
                                 0 -> TonightScreen(active, lastAwake, now, power, preferences, working,
-                                    onSleep = { runAction { MonitorService.start(this@MainActivity, if (active?.night?.phase == Phase.RECOVERY) MonitorService.RESUME else MonitorService.SLEEP) } },
-                                    onWake = { runAction { MonitorService.releaseNow(); stopService(Intent(this@MainActivity, MonitorService::class.java)); feelingId = app.repository.wake() } },
+                                    onSleep = {
+                                        if (active == null) wakeDialog = true
+                                        else runAction { MonitorService.start(this@MainActivity, if (active.night.phase == Phase.RECOVERY) MonitorService.RESUME else MonitorService.SLEEP) }
+                                    },
+                                    onWake = wakeNow,
                                     onReason = { id, text -> runAction { app.repository.reason(id, text) } },
                                     onFeeling = { feelingId = it }, onPhoto = { photo(it) },
                                     onShare = { id -> share(records.filter { it.night.id == id }) }, onPermissions = { tab = 2 }, permissionTick = tick, context = this@MainActivity)
-                                1 -> RecordsScreen(records, { feelingId = it }, { photo(it) }, { share(it) }, { id, text -> runAction { app.repository.reason(id, text) } },
+                                1 -> RecordsScreen(records, preferences, { feelingId = it }, { photo(it) }, { share(it) }, { id, text -> runAction { app.repository.reason(id, text) } },
                                     onEdit = { id, edit -> runAction { app.repository.edit(id, edit) } },
                                     onDelete = { id -> runAction { app.repository.deleteNight(id)?.let { deleted = it } } },
+                                    onEditTargets = { tab = 2 },
                                     scrollState = pageScroll)
                                 else -> SettingsScreen(preferences, tick, this@MainActivity,
                                     onSave = { value -> runAction { app.preferences.save(value) } },
@@ -125,6 +139,13 @@ class MainActivity : ComponentActivity() {
                         Text("只记下现在的真实感受。", color = Muted)
                         listOf("清醒", "一般", "很困").forEach { feeling -> OutlinedButton(onClick = { runAction { app.repository.feeling(id, feeling); feelingId = null } }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(feeling) } }
                     } }, confirmButton = { TextButton(onClick = { feelingId = null }) { Text("稍后补充") } }) }
+                if (morningPrompt) AlertDialog(onDismissRequest = { morningPrompt = false }, title = { Text("醒了吗？") },
+                    text = { Text("昨晚的守候还没结束。点「我醒了」结束后，可以补今天的感受。", color = Muted) },
+                    confirmButton = { TextButton(onClick = { morningPrompt = false; wakeNow() }) { Text("我醒了") } },
+                    dismissButton = { TextButton(onClick = { morningPrompt = false }) { Text("稍后") } },
+                    containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
+                if (wakeDialog) NightWakeDialog(preferences.targetWake, onDismiss = { wakeDialog = false },
+                    onConfirm = { wake -> wakeDialog = false; runAction { MonitorService.start(this@MainActivity, MonitorService.SLEEP, wake) } })
                 if (diagnostic) DiagnosticDialog(this@MainActivity) { diagnostic = false }
                 if (exportRange) AlertDialog(onDismissRequest = { exportRange = false }, title = { Text("导出记录表格") }, text = {
                     Column { listOf(1 to "最近一晚", 7 to "最近7天", 30 to "最近30天").forEach { (days, label) -> TextButton(onClick = { exportRange = false; exportCsv(recordsForDays(records, days)) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(label) } } }
@@ -133,9 +154,11 @@ class MainActivity : ComponentActivity() {
         }
     }
     override fun onResume() {
-        super.onResume(); permissionTick.value++
+        super.onResume(); visible = true; permissionTick.value++
+        MonitorService.dismissMorningPrompt()
         app.scope.launch { if (!MonitorService.running) app.repository.markRecovery() }
     }
+    override fun onPause() { visible = false; super.onPause() }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); permissionTick.value++ }
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("photoPath", pendingPhotoPath); outState.putLong("photoNight", pendingPhotoNight); super.onSaveInstanceState(outState)
@@ -170,4 +193,18 @@ class MainActivity : ComponentActivity() {
         val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.files", file)
         startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/csv").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "导出作息表格"))
     }
+    companion object { @Volatile var visible = false }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable private fun NightWakeDialog(initial: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
+    val state = rememberTimePickerState(initialHour = initial / 60, initialMinute = initial % 60, is24Hour = true)
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("今晚，几点醒？") }, text = {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("给自己一个起床约定", color = Muted, fontSize = 12.sp)
+            TimePicker(state = state)
+        }
+    }, confirmButton = { TextButton(onClick = { onConfirm(state.hour * 60 + state.minute) }) { Text("开始晚安") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
 }

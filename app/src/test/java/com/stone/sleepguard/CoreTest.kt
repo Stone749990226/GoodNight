@@ -65,6 +65,16 @@ class CoreTest {
         val results = (1100L..4000L step 100).map { t -> detector.sample(x, 0f, z, t, true) }
         assertTrue(results.filterNotNull().any { it.startsWith("倾斜") })
     }
+    @Test fun oversleepingPastConfiguredLimitIsNotValid() {
+        val night = Night(id = 4, date = "2026-11-19", firstSleepAt = 0, lastSleepAt = 0,
+            targetBed = 1410, targetWake = 450, wakeAt = 9 * 3_600_000L, phase = Phase.AWAKE, maxSleepMinutes = 600)
+        assertTrue(NightRecord(night, emptyList(), emptyList()).valid)
+        val long = night.copy(wakeAt = 10 * 3_600_000L + 60_000L)
+        val record = NightRecord(long, emptyList(), emptyList())
+        assertTrue(record.overslept)
+        assertFalse(record.valid)
+        assertTrue(NightRecord(night.copy(maxSleepMinutes = 480), emptyList(), emptyList()).overslept)
+    }
     @Test fun customRangeIncludesBothEndsAndKeepsOrder() {
         fun record(id: Long, date: String) = NightRecord(Night(id = id, date = date, firstSleepAt = id,
             lastSleepAt = id, targetBed = 1410, targetWake = 450, phase = Phase.AWAKE), emptyList(), emptyList())
