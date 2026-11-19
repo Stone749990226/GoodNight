@@ -75,6 +75,13 @@ class CoreTest {
         assertFalse(record.valid)
         assertTrue(NightRecord(night.copy(maxSleepMinutes = 480), emptyList(), emptyList()).overslept)
     }
+    @Test fun emailConfigNeedsBothAddressesAndCode() {
+        val partial = EmailSettings(enabled = true, from = "stone@example.com", partner = "fanny@example.com")
+        assertFalse(partial.configured)
+        assertTrue(partial.copy(authCode = "code").configured)
+        assertEquals("stone", partial.myLabel)
+        assertEquals("Fanny", partial.copy(partnerName = "Fanny").partnerLabel)
+    }
     @Test fun customRangeIncludesBothEndsAndKeepsOrder() {
         fun record(id: Long, date: String) = NightRecord(Night(id = id, date = date, firstSleepAt = id,
             lastSleepAt = id, targetBed = 1410, targetWake = 450, phase = Phase.AWAKE), emptyList(), emptyList())

@@ -37,14 +37,28 @@ interface SleepDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun restoreNight(night: Night)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun restoreInterruption(interruption: Interruption)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun restoreEvent(event: NightEvent)
+    @Insert suspend fun insertEmail(job: EmailJob): Long
+    @Query("SELECT * FROM email_outbox WHERE status = 0 ORDER BY id LIMIT 20") suspend fun pendingEmails(): List<EmailJob>
+    @Query("UPDATE email_outbox SET status = 1 WHERE id = :id AND status = 0") suspend fun claimEmail(id: Long): Int
+    @Query("UPDATE email_outbox SET status = 2, attempts = attempts + 1, error = null WHERE id = :id") suspend fun markEmailSent(id: Long)
+    @Query("UPDATE email_outbox SET status = :status, attempts = attempts + 1, error = :error WHERE id = :id") suspend fun markEmailFailed(id: Long, status: Int, error: String?)
+    @Query("UPDATE email_outbox SET status = 0 WHERE status = 1") suspend fun resetSendingEmails()
+    @Query("SELECT COUNT(*) FROM email_outbox WHERE status = 0") suspend fun pendingEmailCount(): Int
+    @Query("SELECT COUNT(*) FROM email_outbox WHERE status = 2") suspend fun sentEmailCount(): Int
 }
 
-@Database(entities = [Night::class, Interruption::class, NightEvent::class], version = 2, exportSchema = false)
+@Database(entities = [Night::class, Interruption::class, NightEvent::class, EmailJob::class], version = 3, exportSchema = false)
 abstract class SleepDatabase : RoomDatabase() { abstract fun dao(): SleepDao }
 
 private val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE nights ADD COLUMN maxSleepMinutes INTEGER NOT NULL DEFAULT 600")
+    }
+}
+
+private val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `email_outbox` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `subject` TEXT NOT NULL, `body` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `status` INTEGER NOT NULL, `attempts` INTEGER NOT NULL, `error` TEXT)")
     }
 }
 
@@ -76,20 +90,24 @@ fun powerStatus(context: Context): PowerStatus {
 }
 
 class SleepRepository(private val context: Context) {
-    private val db = Room.databaseBuilder(context, SleepDatabase::class.java, "sleep.db").addMigrations(MIGRATION_1_2).build()
+    private val db = Room.databaseBuilder(context, SleepDatabase::class.java, "sleep.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
     val dao = db.dao()
     private val mutex = Mutex()
     val records = dao.observeRecords()
     val active = dao.observeActive()
     suspend fun startSleep(settings: SleepSettings, now: Long = System.currentTimeMillis()) = mutex.withLock {
         check(powerStatus(context).eligible) { "请先连接充电器，并确认手机正在充电" }
-        db.withTransaction {
+        var created = false
+        val id = db.withTransaction {
             val current = dao.active()
             check(current?.night?.phase !in listOf(Phase.SETTLING, Phase.MONITORING)) { "已经开始监控了" }
             check(current?.pending == null) { "请先填写这次拿起手机的原因" }
-            val id = if (current == null) dao.insert(Night(date = nightDate(now), firstSleepAt = now,
-                lastSleepAt = now, targetBed = settings.targetBed, targetWake = settings.targetWake,
-                armedAt = now + 15_000, maxSleepMinutes = settings.maxSleepHours * 60)) else {
+            val id = if (current == null) {
+                created = true
+                dao.insert(Night(date = nightDate(now), firstSleepAt = now,
+                    lastSleepAt = now, targetBed = settings.targetBed, targetWake = settings.targetWake,
+                    armedAt = now + 15_000, maxSleepMinutes = settings.maxSleepHours * 60))
+            } else {
                 current.interruptions.filter { !it.morning && it.returnedAt == null }.forEach { dao.update(it.copy(returnedAt = now)) }
                 dao.update(current.night.copy(lastSleepAt = now, phase = Phase.SETTLING, armedAt = now + 15_000, heartbeatAt = now,
                     maxSleepMinutes = settings.maxSleepHours * 60))
@@ -98,6 +116,8 @@ class SleepRepository(private val context: Context) {
             dao.insert(NightEvent(nightId = id, at = now, type = "SLEEP", detail = "本人点击我去睡了；15秒后开始检测"))
             id
         }
+        dao.record(id)?.let { EmailNotifier.sleep(context, it, again = !created) }
+        id
     }
     suspend fun arm() = mutex.withLock {
         val record = dao.active() ?: return@withLock
@@ -119,21 +139,29 @@ class SleepRepository(private val context: Context) {
     suspend fun reason(id: Long, text: String) = mutex.withLock {
         val trimmed = text.trim()
         require(trimmed.isNotEmpty()) { "请手动写下拿起手机的原因" }
+        var firstReason: Pair<Long, Long>? = null
         db.withTransaction {
             val interruption = dao.interruption(id) ?: error("记录不存在")
             val record = dao.record(interruption.nightId) ?: error("记录不存在")
+            if (interruption.reason.isNullOrBlank()) firstReason = interruption.id to interruption.nightId
             dao.update(interruption.copy(reason = trimmed))
             if (record.night.phase == Phase.PENDING && record.pending?.id == id)
                 dao.update(record.night.copy(phase = Phase.TEMP, heartbeatAt = System.currentTimeMillis()))
         }
+        firstReason?.let { (interruptionId, nightId) ->
+            dao.record(nightId)?.let { record ->
+                dao.interruption(interruptionId)?.let { EmailNotifier.interruption(context, record, it) }
+            }
+        }
     }
     suspend fun wake(now: Long = System.currentTimeMillis()): Long? = mutex.withLock {
         val record = dao.active() ?: return@withLock null
+        check(record.pending == null) { "请先填写这次拿起手机的原因" }
         db.withTransaction {
-            record.pending?.takeIf { it.detectedAt >= now - 300_000 }?.let { dao.update(it.copy(morning = true)) }
             dao.update(record.night.copy(phase = Phase.AWAKE, wakeAt = now, heartbeatAt = now))
             dao.insert(NightEvent(nightId = record.night.id, at = now, type = "WAKE", detail = "本人点击醒了；监控结束"))
         }
+        dao.record(record.night.id)?.let { EmailNotifier.wake(context, it) }
         record.night.id
     }
     suspend fun feeling(id: Long, feeling: String) = mutex.withLock { dao.record(id)?.night?.let { dao.update(it.copy(feeling = feeling)) } }
@@ -153,6 +181,7 @@ class SleepRepository(private val context: Context) {
                 detail = "上次存活记录 ${clock(record.night.heartbeatAt)}；服务中断期间无法确认活动"))
             dao.update(record.night.copy(phase = Phase.RECOVERY))
         }
+        dao.record(record.night.id)?.let { EmailNotifier.gap(context, it) }
     }
     suspend fun resume() = mutex.withLock {
         val record = dao.active() ?: return@withLock

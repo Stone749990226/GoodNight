@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
             NightTheme {
                 val records by app.repository.records.collectAsStateWithLifecycle(emptyList())
                 val preferences by app.preferences.flow.collectAsStateWithLifecycle(SleepSettings())
+                val email by app.emailPreferences.flow.collectAsStateWithLifecycle(EmailSettings())
                 val working by busy.collectAsStateWithLifecycle()
                 val tick by permissionTick.collectAsStateWithLifecycle()
                 val message by app.message.collectAsStateWithLifecycle()
@@ -90,7 +91,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val wakeNow: () -> Unit = {
-                    runAction { MonitorService.releaseNow(); stopService(Intent(this@MainActivity, MonitorService::class.java)); feelingId = app.repository.wake() }
+                    runAction { val id = app.repository.wake(); MonitorService.releaseNow(); stopService(Intent(this@MainActivity, MonitorService::class.java)); feelingId = id }
                 }
                 val active = records.firstOrNull { it.night.phase != Phase.AWAKE }
                 val lastAwake = records.firstOrNull { it.night.phase == Phase.AWAKE }
@@ -121,8 +122,10 @@ class MainActivity : ComponentActivity() {
                                     onEdit = { id, edit -> runAction { app.repository.edit(id, edit) } },
                                     onDelete = { id -> runAction { app.repository.deleteNight(id)?.let { deleted = it } } },
                                     scrollState = pageScroll)
-                                else -> SettingsScreen(preferences, tick, this@MainActivity,
+                                else -> SettingsScreen(preferences, email, tick, this@MainActivity,
                                     onSave = { value -> runAction { app.preferences.save(value) } },
+                                    onSaveEmail = { value -> runAction { app.emailPreferences.save(value) } },
+                                    onTestEmail = { runAction { app.emailSender.sendTest(); app.message.value = "测试邮件已发送" } },
                                     onNotifications = { if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                                         else openSettings(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) },
                                     onOverlay = { openSettings(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) },

@@ -36,6 +36,7 @@ class MonitorService : Service(), SensorEventListener {
     private var foregroundOk = false
     private var lastBeat = 0L
     private var morningNotified = false
+    private var oversleptNotified = false
     private var lastMorningPromptAt = 0L
     private var reminderNightId: Long? = null
     private var overlayIsMorning = false
@@ -81,6 +82,7 @@ class MonitorService : Service(), SensorEventListener {
                 if (it?.night?.id != reminderNightId) {
                     reminderNightId = it?.night?.id
                     morningNotified = false
+                    oversleptNotified = false
                     lastMorningPromptAt = 0L
                     if (it == null) getSystemService(NotificationManager::class.java).cancel(MORNING_NOTIFICATION)
                 }
@@ -97,13 +99,21 @@ class MonitorService : Service(), SensorEventListener {
                     if (!ending && detector != null && record.night.phase in listOf(Phase.SETTLING, Phase.MONITORING)) wakeLock.acquire(600_000L)
                     repo.heartbeat()
                 }
-                if (!ending && record?.night?.phase == Phase.MONITORING && System.currentTimeMillis() >= morningReminderAt(record)) {
-                    if (!morningNotified) {
-                        morningNotified = true
-                        getSystemService(NotificationManager::class.java).notify(MORNING_NOTIFICATION, morningNotification())
-                        if (foregroundOk) getSystemService(NotificationManager::class.java).notify(NOTIFICATION, notification("早上了，记得点我醒了"))
+                if (!ending && record?.night?.phase == Phase.MONITORING) {
+                    val now = System.currentTimeMillis()
+                    if (now >= morningReminderAt(record)) {
+                        if (!morningNotified) {
+                            morningNotified = true
+                            getSystemService(NotificationManager::class.java).notify(MORNING_NOTIFICATION, morningNotification())
+                            if (foregroundOk) getSystemService(NotificationManager::class.java).notify(NOTIFICATION, notification("早上了，记得点我醒了"))
+                            EmailNotifier.missedWake(this@MonitorService, record, now)
+                        }
+                        showMorningPrompt()
                     }
-                    showMorningPrompt()
+                    if (!oversleptNotified && now >= record.night.lastSleepAt + record.night.maxSleepMinutes * 60_000L) {
+                        oversleptNotified = true
+                        EmailNotifier.overslept(this@MonitorService, record)
+                    }
                 }
             }
         }
@@ -191,6 +201,7 @@ class MonitorService : Service(), SensorEventListener {
     }
 
     private suspend fun finishNight() {
+        if (current?.pending != null) throw IllegalStateException("请先填写这次拿起手机的原因")
         ending = true
         sensors.unregisterListener(this)
         detector = null; sensorKey = null
@@ -311,22 +322,6 @@ class MonitorService : Service(), SensorEventListener {
         val error = text("", 13f); layout.addView(error)
         val submit = Button(this).apply { text = "记录原因"; isAllCaps = false }
         layout.addView(submit, LinearLayout.LayoutParams(-1, dp(56)))
-        layout.addView(Button(this).apply {
-            text = "我醒了，结束监控"; isAllCaps = false
-            setOnClickListener {
-                scope.launch {
-                    try {
-                        // Release monitoring resources before waiting for the database.
-                        ending = true
-                        sensors.unregisterListener(this@MonitorService); detector = null; sensorKey = null
-                        if (wakeLock.isHeld) wakeLock.release()
-                        repo.wake(); removeOverlay()
-                        startActivity(Intent(this@MonitorService, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("feeling", true))
-                        stopSelf()
-                    } catch (e: Exception) { error.text = e.message }
-                }
-            }
-        }, LinearLayout.LayoutParams(-1, dp(56)))
         submit.setOnClickListener {
             if (input.text.toString().isBlank()) { error.text = "请手动填写原因"; return@setOnClickListener }
             submit.isEnabled = false

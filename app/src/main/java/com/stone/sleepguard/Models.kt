@@ -62,6 +62,18 @@ data class NightEvent(
     val detail: String = "",
 )
 
+@Entity(tableName = "email_outbox")
+data class EmailJob(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val kind: String,
+    val subject: String,
+    val body: String,
+    val createdAt: Long,
+    val status: Int = 0,
+    val attempts: Int = 0,
+    val error: String? = null,
+)
+
 data class NightRecord(
     @Embedded val night: Night,
     @Relation(parentColumn = "id", entityColumn = "nightId") val interruptions: List<Interruption>,

@@ -5,24 +5,32 @@ import android.content.Context
 import android.hardware.*
 import android.os.*
 import android.provider.Settings
+import android.util.Patterns
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.*
 import kotlinx.coroutines.delay
 
-@Composable internal fun SettingsScreen(settings: SleepSettings, tick: Int, context: Context, onSave: (SleepSettings) -> Unit,
+@Composable internal fun SettingsScreen(settings: SleepSettings, email: EmailSettings, tick: Int, context: Context,
+    onSave: (SleepSettings) -> Unit, onSaveEmail: (EmailSettings) -> Unit, onTestEmail: () -> Unit,
     onNotifications: () -> Unit, onOverlay: () -> Unit, onBattery: () -> Unit, onVivo: () -> Unit,
     onDiagnostic: () -> Unit, onExport: () -> Unit) {
     SectionLabel("按你的节奏", "PREFERENCES")
     var editBed by remember { mutableStateOf(false) }; var editWake by remember { mutableStateOf(false) }
     var editMaxSleep by remember { mutableStateOf(false) }
+    var editEmail by remember { mutableStateOf(false) }
     SoftCard {
         Text("目标作息", fontSize = 17.sp, color = Cream)
         SettingRow("放下手机", minutesText(settings.targetBed)) { editBed = true }
@@ -34,6 +42,23 @@ import kotlinx.coroutines.delay
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("移动检测", fontSize = 16.sp, color = Cream, modifier = Modifier.weight(1f))
             OutlinedButton(onClick = onDiagnostic) { Text("开始自测") }
+        }
+    }
+    SoftCard {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("邮件通知", fontSize = 16.sp, color = Cream)
+                Text(if (email.enabled) "每次事件会立即通知对方" else "未开启", fontSize = 11.sp, color = Muted)
+            }
+            Switch(checked = email.enabled, onCheckedChange = { on ->
+                if (on && !email.configured) editEmail = true else onSaveEmail(email.copy(enabled = on))
+            })
+        }
+        SettingRow("发件邮箱", email.from.ifBlank { "去设置" }) { editEmail = true }
+        SettingRow("发送给", email.partner.ifBlank { "去设置" }) { editEmail = true }
+        SettingRow("授权码", if (email.hasAuthCode) "已保存" else "去设置") { editEmail = true }
+        OutlinedButton(onClick = onTestEmail, enabled = email.configured, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+            Text("发送测试邮件")
         }
     }
     val notifications = remember(tick) { context.getSystemService(NotificationManager::class.java).areNotificationsEnabled() }
@@ -55,7 +80,59 @@ import kotlinx.coroutines.delay
     if (editBed) EditTimeDialog(settings.targetBed, "几点放下手机", { editBed = false }) { onSave(settings.copy(targetBed = it)); editBed = false }
     if (editWake) EditTimeDialog(settings.targetWake, "几点起床", { editWake = false }) { onSave(settings.copy(targetWake = it)); editWake = false }
     if (editMaxSleep) MaxSleepDialog(settings.maxSleepHours, { editMaxSleep = false }) { onSave(settings.copy(maxSleepHours = it)); editMaxSleep = false }
+    if (editEmail) EmailConfigDialog(email, { editEmail = false }) { editEmail = false; onSaveEmail(it) }
 }
+@Composable private fun EmailConfigDialog(current: EmailSettings, onDismiss: () -> Unit, onSave: (EmailSettings) -> Unit) {
+    var from by remember { mutableStateOf(current.from) }
+    var partner by remember { mutableStateOf(current.partner) }
+    var host by remember { mutableStateOf(current.host) }
+    var port by remember { mutableStateOf(current.port.toString()) }
+    var myName by remember { mutableStateOf(current.myName) }
+    var partnerName by remember { mutableStateOf(current.partnerName) }
+    var auth by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    fun validEmail(value: String) = Patterns.EMAIL_ADDRESS.matcher(value.trim()).matches()
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("邮件通知设置") }, text = {
+        Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("QQ 邮箱填 smtp.qq.com / 465；授权码不是登录密码。", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+            OutlinedTextField(from, { from = it }, label = { Text("发件邮箱") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(auth, { auth = it }, label = { Text("授权码") },
+                placeholder = { Text(if (current.hasAuthCode) "已保存，留空不修改" else "邮箱授权码") }, singleLine = true,
+                visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(partner, { partner = it }, label = { Text("对方邮箱") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth())
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(myName, { myName = it }, label = { Text("我的名字") }, singleLine = true, modifier = Modifier.weight(1f))
+                OutlinedTextField(partnerName, { partnerName = it }, label = { Text("对方名字") }, singleLine = true, modifier = Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(host, { host = it }, label = { Text("SMTP 服务器") }, singleLine = true, modifier = Modifier.weight(1f))
+                OutlinedTextField(port, { port = it }, label = { Text("端口") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.width(96.dp))
+            }
+            error?.let { Text(it, color = Amber, fontSize = 12.sp) }
+        }
+    }, confirmButton = {
+        TextButton(onClick = {
+            val portValue = port.toIntOrNull()
+            val problem = when {
+                !validEmail(from) -> "请填写正确的发件邮箱"
+                !validEmail(partner) -> "请填写正确的对方邮箱"
+                host.isBlank() -> "请填写 SMTP 服务器"
+                portValue == null || portValue !in 1..65535 -> "端口不正确"
+                auth.isBlank() && !current.hasAuthCode -> "请填写邮箱授权码"
+                else -> null
+            }
+            if (problem != null) error = problem
+            else onSave(current.copy(from = from.trim(), partner = partner.trim(), host = host.trim(),
+                port = portValue!!, myName = myName.trim(), partnerName = partnerName.trim(), authCode = auth.trim()))
+        }) { Text("保存") }
+    }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
+}
+
 @Composable private fun MaxSleepDialog(initial: Int, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
     var hours by remember { mutableIntStateOf(initial) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("最多睡多久") }, text = {
