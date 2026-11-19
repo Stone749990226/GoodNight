@@ -53,6 +53,9 @@ class MainActivity : ComponentActivity() {
                 val records by app.repository.records.collectAsStateWithLifecycle(emptyList())
                 val preferences by app.preferences.flow.collectAsStateWithLifecycle(SleepSettings())
                 val email by app.emailPreferences.flow.collectAsStateWithLifecycle(EmailSettings())
+                val roleState by app.rolePreferences.flow.collectAsStateWithLifecycle(RoleState())
+                val role = roleState.role
+                val partner = partnerName(role)
                 val working by busy.collectAsStateWithLifecycle()
                 val tick by permissionTick.collectAsStateWithLifecycle()
                 val message by app.message.collectAsStateWithLifecycle()
@@ -110,6 +113,7 @@ class MainActivity : ComponentActivity() {
                         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(pageScroll).padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             when (tab) {
                                 0 -> TonightScreen(active, lastAwake, now, power, preferences, working,
+                                    partner = partner,
                                     onSleep = {
                                         if (active == null) wakeDialog = true
                                         else runAction { MonitorService.start(this@MainActivity, if (active.night.phase == Phase.RECOVERY) MonitorService.RESUME else MonitorService.SLEEP) }
@@ -122,7 +126,7 @@ class MainActivity : ComponentActivity() {
                                     onEdit = { id, edit -> runAction { app.repository.edit(id, edit) } },
                                     onDelete = { id -> runAction { app.repository.deleteNight(id)?.let { deleted = it } } },
                                     scrollState = pageScroll)
-                                else -> SettingsScreen(preferences, email, tick, this@MainActivity,
+                                else -> SettingsScreen(preferences, email, role, tick, this@MainActivity,
                                     onSave = { value -> runAction { app.preferences.save(value) } },
                                     onSaveEmail = { value -> runAction { app.emailPreferences.save(value) } },
                                     onTestEmail = { runAction { app.emailSender.sendTest(); app.message.value = "测试邮件已发送" } },
@@ -152,6 +156,8 @@ class MainActivity : ComponentActivity() {
                 if (exportRange) AlertDialog(onDismissRequest = { exportRange = false }, title = { Text("导出记录表格") }, text = {
                     Column { listOf(1 to "最近一晚", 7 to "最近7天", 30 to "最近30天").forEach { (days, label) -> TextButton(onClick = { exportRange = false; exportCsv(recordsForDays(records, days)) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(label) } } }
                 }, confirmButton = { TextButton(onClick = { exportRange = false }) { Text("取消") } })
+                if (!roleState.loaded) Box(Modifier.fillMaxSize().background(Ink))
+                else if (role == null) RolePickerScreen { chosen -> app.scope.launch { app.rolePreferences.choose(chosen) } }
             }
         }
     }
@@ -196,6 +202,24 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/csv").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "导出作息表格"))
     }
     companion object { @Volatile var visible = false }
+}
+
+@Composable private fun RolePickerScreen(onPick: (Role) -> Unit) {
+    Box(Modifier.fillMaxSize().background(Ink), contentAlignment = Alignment.Center) {
+        Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("晚安", fontSize = 30.sp, color = Cream, fontWeight = FontWeight.Light)
+            Text("这台手机是谁的？", fontSize = 21.sp, color = Cream, fontWeight = FontWeight.Medium)
+            Text("选好后不能更改，我会一直记得你。", color = Muted, fontSize = 12.sp)
+            Spacer(Modifier.height(4.dp))
+            OutlinedButton(onClick = { onPick(Role.STONE) }, modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp)) {
+                Text("我是 Stone 💙", fontSize = 17.sp, color = Cream)
+            }
+            OutlinedButton(onClick = { onPick(Role.FANNY) }, modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp)) {
+                Text("我是 Fanny 💗", fontSize = 17.sp, color = Cream)
+            }
+        }
+    }
 }
 
 @Composable private fun NightWakeDialog(initial: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {

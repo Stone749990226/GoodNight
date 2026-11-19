@@ -9,36 +9,36 @@ import kotlinx.coroutines.launch
 object EmailNotifier {
     private data class Payload(val kind: String, val subject: String, val body: String)
 
-    fun sleep(context: Context, record: NightRecord, again: Boolean) = dispatch(context) { config ->
-        val name = config.myLabel
+    fun sleep(context: Context, record: NightRecord, again: Boolean) = dispatch(context) { config, role ->
+        val name = roleName(role)
         val at = record.night.lastSleepAt
         if (again) Payload("SLEEP_AGAIN", "🌙 $name 再次说晚安 · ${clock(at)}", """
             $name 在 ${clock(at)} 再次说晚安。
             上次拿起的原因：${record.disruptions.lastOrNull()?.reason ?: "—"}。
             重新开始守候。
 
-            —— 晚安
+            —— 晚安 🫶
         """.trimIndent())
         else Payload("SLEEP", "🌙 $name 说晚安了 · ${clock(at)}", """
             $name 在 ${clock(at)} 说要睡了。
             今晚目标起床：${minutesText(record.night.targetWake)}。
             已经开始守候，半夜拿起手机会记录并通知你。
 
-            —— 晚安
+            —— 晚安 🫶
         """.trimIndent())
     }
 
-    fun interruption(context: Context, record: NightRecord, interruption: Interruption) = dispatch(context) { config ->
-        Payload("INTERRUPTION", "🌙 ${config.myLabel} 半夜拿起了手机 · ${clock(interruption.detectedAt)}", """
-            ${config.myLabel} 在 ${clock(interruption.detectedAt)} 拿起了手机。
+    fun interruption(context: Context, record: NightRecord, interruption: Interruption) = dispatch(context) { config, role ->
+        Payload("INTERRUPTION", "🌙 ${roleName(role)} 半夜拿起了手机 · ${clock(interruption.detectedAt)}", """
+            ${roleName(role)} 在 ${clock(interruption.detectedAt)} 拿起了手机。
             原因：${interruption.reason ?: "—"}。
 
-            —— 晚安
+            —— 晚安 🫶
         """.trimIndent())
     }
 
-    fun wake(context: Context, record: NightRecord) = dispatch(context) { config ->
-        val name = config.myLabel
+    fun wake(context: Context, record: NightRecord) = dispatch(context) { config, role ->
+        val name = roleName(role)
         val wake = record.night.wakeAt ?: return@dispatch null
         val lines = record.interruptions.sortedBy { it.detectedAt }.joinToString("\n") { i ->
             val reason = if (i.morning) "起床操作" else (i.reason ?: "原因待补充")
@@ -60,45 +60,46 @@ object EmailNotifier {
             目标：${minutesText(record.night.targetBed)} 放下手机 / ${minutesText(record.night.targetWake)} 起床
             结果：$result
 
-            —— 晚安
+            —— 早安，${partnerName(role)} ☀️
         """.trimIndent())
     }
 
-    fun missedWake(context: Context, record: NightRecord, now: Long = System.currentTimeMillis()) = dispatch(context) { config ->
-        Payload("MISSED_WAKE", "☀️ ${config.myLabel} 还没点我醒了 · ${clock(now)}", """
-            到了 ${clock(now)}，${config.myLabel} 还没有点我醒了。
+    fun missedWake(context: Context, record: NightRecord, now: Long = System.currentTimeMillis()) = dispatch(context) { config, role ->
+        Payload("MISSED_WAKE", "☀️ ${roleName(role)} 还没点我醒了 · ${clock(now)}", """
+            到了 ${clock(now)}，${roleName(role)} 还没有点我醒了。
             昨晚仍在守候；目标起床：${minutesText(record.night.targetWake)}。
 
-            —— 晚安
+            —— 早安，${partnerName(role)} ☀️
         """.trimIndent())
     }
 
-    fun overslept(context: Context, record: NightRecord) = dispatch(context) { config ->
+    fun overslept(context: Context, record: NightRecord) = dispatch(context) { config, role ->
         val hours = record.night.maxSleepMinutes / 60
-        Payload("OVERSLEPT", "☀️ ${config.myLabel} 超过 $hours 小时还没醒", """
-            ${config.myLabel} 已经超过 $hours 小时没有点我醒了，守候仍在继续。
+        Payload("OVERSLEPT", "☀️ ${roleName(role)} 超过 $hours 小时还没醒", """
+            ${roleName(role)} 已经超过 $hours 小时没有点我醒了，守候仍在继续。
             这一晚会计为超长，不计入平均。
 
-            —— 晚安
+            —— 早安，${partnerName(role)} ☀️
         """.trimIndent())
     }
 
-    fun gap(context: Context, record: NightRecord) = dispatch(context) { config ->
-        Payload("GAP", "⚠️ ${config.myLabel} 的守候中断了", """
-            ${config.myLabel} 的守候中断过（上次存活：${clock(record.night.heartbeatAt)}）。
+    fun gap(context: Context, record: NightRecord) = dispatch(context) { config, role ->
+        Payload("GAP", "⚠️ ${roleName(role)} 的守候中断了", """
+            ${roleName(role)} 的守候中断过（上次存活：${clock(record.night.heartbeatAt)}）。
             监控缺口已记录，这一晚不计入平均。
 
-            —— 晚安
+            —— 晚安 🫶
         """.trimIndent())
     }
 
-    private fun dispatch(context: Context, build: (EmailSettings) -> Payload?) {
+    private fun dispatch(context: Context, build: (EmailSettings, Role?) -> Payload?) {
         val app = context.applicationContext as? SleepApp ?: return
         app.scope.launch(Dispatchers.IO) {
             runCatching {
                 val config = app.emailPreferences.flow.first()
                 if (!config.enabled || !config.configured) return@launch
-                val payload = build(config) ?: return@launch
+                val role = app.rolePreferences.flow.first().role
+                val payload = build(config, role) ?: return@launch
                 app.repository.dao.insertEmail(EmailJob(
                     kind = payload.kind, subject = payload.subject, body = payload.body, createdAt = System.currentTimeMillis()))
                 EmailWork.schedule(context)

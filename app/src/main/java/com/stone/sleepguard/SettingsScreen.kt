@@ -23,7 +23,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.*
 import kotlinx.coroutines.delay
 
-@Composable internal fun SettingsScreen(settings: SleepSettings, email: EmailSettings, tick: Int, context: Context,
+@Composable internal fun SettingsScreen(settings: SleepSettings, email: EmailSettings, role: Role?, tick: Int, context: Context,
     onSave: (SleepSettings) -> Unit, onSaveEmail: (EmailSettings) -> Unit, onTestEmail: () -> Unit,
     onNotifications: () -> Unit, onOverlay: () -> Unit, onBattery: () -> Unit, onVivo: () -> Unit,
     onDiagnostic: () -> Unit, onExport: () -> Unit) {
@@ -48,7 +48,8 @@ import kotlinx.coroutines.delay
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("邮件通知", fontSize = 16.sp, color = Cream)
-                Text(if (email.enabled) "每次事件会立即通知对方" else "未开启", fontSize = 11.sp, color = Muted)
+                Text("${roleName(role)} ⇄ ${partnerName(role)} · ${if (email.enabled) "每次事件都会通知对方" else "未开启"}",
+                    fontSize = 11.sp, color = Muted)
             }
             Switch(checked = email.enabled, onCheckedChange = { on ->
                 if (on && !email.configured) editEmail = true else onSaveEmail(email.copy(enabled = on))
@@ -87,8 +88,6 @@ import kotlinx.coroutines.delay
     var partner by remember { mutableStateOf(current.partner) }
     var host by remember { mutableStateOf(current.host) }
     var port by remember { mutableStateOf(current.port.toString()) }
-    var myName by remember { mutableStateOf(current.myName) }
-    var partnerName by remember { mutableStateOf(current.partnerName) }
     var auth by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     fun validEmail(value: String) = Patterns.EMAIL_ADDRESS.matcher(value.trim()).matches()
@@ -103,10 +102,6 @@ import kotlinx.coroutines.delay
                 modifier = Modifier.fillMaxWidth())
             OutlinedTextField(partner, { partner = it }, label = { Text("对方邮箱") }, singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(myName, { myName = it }, label = { Text("我的名字") }, singleLine = true, modifier = Modifier.weight(1f))
-                OutlinedTextField(partnerName, { partnerName = it }, label = { Text("对方名字") }, singleLine = true, modifier = Modifier.weight(1f))
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(host, { host = it }, label = { Text("SMTP 服务器") }, singleLine = true, modifier = Modifier.weight(1f))
                 OutlinedTextField(port, { port = it }, label = { Text("端口") }, singleLine = true,
@@ -127,7 +122,7 @@ import kotlinx.coroutines.delay
             }
             if (problem != null) error = problem
             else onSave(current.copy(from = from.trim(), partner = partner.trim(), host = host.trim(),
-                port = portValue!!, myName = myName.trim(), partnerName = partnerName.trim(), authCode = auth.trim()))
+                port = portValue!!, authCode = auth.trim()))
         }) { Text("保存") }
     }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
         containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)

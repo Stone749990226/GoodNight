@@ -13,13 +13,13 @@ object Phase {
     const val RECOVERY = "RECOVERY"
     const val AWAKE = "AWAKE"
     fun label(value: String?) = when (value) {
-        SETTLING -> "请放下手机"
-        MONITORING -> "正在安静守候"
-        PENDING -> "有一条原因待填写"
-        TEMP -> "临时使用中"
-        RECOVERY -> "监控曾中断，等待恢复"
-        AWAKE -> "今天，醒来了"
-        else -> "把今晚留给好好休息"
+        SETTLING -> "轻轻放下手机"
+        MONITORING -> "今晚也要好好睡"
+        PENDING -> "怎么又拿起手机啦"
+        TEMP -> "忙完再睡"
+        RECOVERY -> "刚刚走神了一下"
+        AWAKE -> "今天也要开心"
+        else -> "今晚也要好好睡"
     }
 }
 

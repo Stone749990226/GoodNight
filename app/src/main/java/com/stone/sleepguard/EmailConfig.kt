@@ -21,14 +21,10 @@ data class EmailSettings(
     val port: Int = 465,
     val from: String = "",
     val partner: String = "",
-    val myName: String = "",
-    val partnerName: String = "",
     val authCode: String = "",
     val hasAuthCode: Boolean = false,
 ) {
     val configured get() = from.isNotBlank() && partner.isNotBlank() && host.isNotBlank() && authCode.isNotBlank()
-    val myLabel get() = myName.ifBlank { from.substringBefore('@').ifBlank { "我" } }
-    val partnerLabel get() = partnerName.ifBlank { partner.substringBefore('@').ifBlank { "对方" } }
 }
 
 class EmailPreferences(context: Context) {
@@ -38,8 +34,6 @@ class EmailPreferences(context: Context) {
     private val port = intPreferencesKey("port")
     private val from = stringPreferencesKey("from")
     private val partner = stringPreferencesKey("partner")
-    private val myName = stringPreferencesKey("myName")
-    private val partnerName = stringPreferencesKey("partnerName")
     private val auth = stringPreferencesKey("authCipher")
 
     val flow = store.data.map { p ->
@@ -50,8 +44,6 @@ class EmailPreferences(context: Context) {
             port = p[port] ?: 465,
             from = p[from].orEmpty(),
             partner = p[partner].orEmpty(),
-            myName = p[myName].orEmpty(),
-            partnerName = p[partnerName].orEmpty(),
             authCode = cipher?.let { EmailSecret.decrypt(it) }.orEmpty(),
             hasAuthCode = cipher != null,
         )
@@ -64,8 +56,6 @@ class EmailPreferences(context: Context) {
             p[port] = value.port
             p[from] = value.from.trim()
             p[partner] = value.partner.trim()
-            p[myName] = value.myName.trim()
-            p[partnerName] = value.partnerName.trim()
             if (value.authCode.isNotBlank()) {
                 val encrypted = EmailSecret.encrypt(value.authCode) ?: error("无法保存授权码，请重试")
                 p[auth] = encrypted

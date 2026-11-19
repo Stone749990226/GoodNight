@@ -79,8 +79,12 @@ class CoreTest {
         val partial = EmailSettings(enabled = true, from = "stone@example.com", partner = "fanny@example.com")
         assertFalse(partial.configured)
         assertTrue(partial.copy(authCode = "code").configured)
-        assertEquals("stone", partial.myLabel)
-        assertEquals("Fanny", partial.copy(partnerName = "Fanny").partnerLabel)
+    }
+    @Test fun rolesPairWithEachOther() {
+        assertEquals(Role.FANNY, Role.STONE.partner)
+        assertEquals(Role.STONE, Role.FANNY.partner)
+        assertEquals("Fanny", partnerName(Role.STONE))
+        assertEquals("Stone", partnerName(Role.FANNY))
     }
     @Test fun customRangeIncludesBothEndsAndKeepsOrder() {
         fun record(id: Long, date: String) = NightRecord(Night(id = id, date = date, firstSleepAt = id,

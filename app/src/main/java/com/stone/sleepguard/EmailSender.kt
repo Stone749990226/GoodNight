@@ -74,7 +74,7 @@ class EmailSender(private val context: Context) {
             override fun getPasswordAuthentication() = PasswordAuthentication(config.from, config.authCode)
         })
         val message = MimeMessage(session).apply {
-            setFrom(InternetAddress(config.from, config.myName.takeIf { it.isNotBlank() }))
+            setFrom(InternetAddress(config.from))
             setRecipients(Message.RecipientType.TO, InternetAddress.parse(config.partner))
             setSubject(subject, "UTF-8")
             setText(body, "UTF-8")
