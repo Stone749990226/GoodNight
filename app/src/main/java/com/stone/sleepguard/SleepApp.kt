@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 class SleepApp : Application() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -14,4 +15,9 @@ class SleepApp : Application() {
     val emailPreferences by lazy { EmailPreferences(this) }
     val emailSender by lazy { EmailSender(this) }
     val message = MutableStateFlow<String?>(null)
+
+    override fun onCreate() {
+        super.onCreate()
+        scope.launch { preferences.migrateDefaults() }
+    }
 }

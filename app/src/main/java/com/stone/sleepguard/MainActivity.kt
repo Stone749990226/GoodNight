@@ -22,6 +22,7 @@ import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
@@ -91,6 +92,12 @@ class MainActivity : ComponentActivity() {
                     if (intent.getBooleanExtra("feeling", false) && records.isNotEmpty()) {
                         feelingId = records.firstOrNull { it.night.phase == Phase.AWAKE && it.night.feeling == null }?.night?.id
                         intent.removeExtra("feeling")
+                    } else if (feelingId == null) {
+                        val recent = records.firstOrNull {
+                            it.night.phase == Phase.AWAKE && it.night.feeling == null &&
+                                (it.night.wakeAt ?: 0) > System.currentTimeMillis() - 6 * 3_600_000L
+                        }
+                        if (recent != null) feelingId = recent.night.id
                     }
                 }
                 val wakeNow: () -> Unit = {
@@ -140,11 +147,18 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                feelingId?.let { id -> AlertDialog(onDismissRequest = { feelingId = null }, title = { Text("醒来，感觉怎么样？") },
-                    text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("只记下现在的真实感受。", color = Muted)
-                        listOf("清醒", "一般", "很困").forEach { feeling -> OutlinedButton(onClick = { runAction { app.repository.feeling(id, feeling); feelingId = null } }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(feeling) } }
-                    } }, confirmButton = { TextButton(onClick = { feelingId = null }) { Text("稍后补充") } }) }
+                feelingId?.let { id -> Dialog(onDismissRequest = { }) {
+                    Surface(shape = RoundedCornerShape(26.dp), color = Panel) {
+                        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("早安，昨晚睡得怎么样？", fontSize = 20.sp, color = Cream, fontWeight = FontWeight.Medium)
+                            Text("选一个真实感受才能结束这一晚；户外照片可稍后补拍，不是必填。", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+                            listOf("清醒", "一般", "很困").forEach { feeling ->
+                                OutlinedButton(onClick = { runAction { app.repository.feeling(id, feeling); feelingId = null } },
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(feeling, fontSize = 16.sp, color = Cream) }
+                            }
+                        }
+                    }
+                } }
                 if (morningPrompt) AlertDialog(onDismissRequest = { morningPrompt = false }, title = { Text("醒了吗？") },
                     text = { Text("昨晚的守候还没结束。点「我醒了」结束后，可以补今天的感受。", color = Muted) },
                     confirmButton = { TextButton(onClick = { morningPrompt = false; wakeNow() }) { Text("我醒了") } },

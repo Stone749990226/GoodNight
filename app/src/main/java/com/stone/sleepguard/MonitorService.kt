@@ -40,6 +40,7 @@ class MonitorService : Service(), SensorEventListener {
     private var lastMorningPromptAt = 0L
     private var reminderNightId: Long? = null
     private var overlayIsMorning = false
+    private var partnerDisplay = "对方"
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val type = when (intent.action) {
@@ -76,6 +77,7 @@ class MonitorService : Service(), SensorEventListener {
             addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT)
             addAction(Intent.ACTION_POWER_CONNECTED); addAction(Intent.ACTION_POWER_DISCONNECTED)
         }, ContextCompat.RECEIVER_NOT_EXPORTED)
+        scope.launch { app.rolePreferences.flow.collect { partnerDisplay = partnerName(it.role) } }
         scope.launch {
             repo.active.collect {
                 current = it
@@ -311,10 +313,9 @@ class MonitorService : Service(), SensorEventListener {
             elevation = dp(12).toFloat()
         }
         fun text(value: String, size: Float = 16f) = TextView(this).apply { text = value; textSize = size; setTextColor(Color.rgb(226, 239, 233)); setPadding(0, 0, 0, dp(12)) }
-        layout.addView(text("快去睡觉，为什么又拿起手机了？", 21f).apply { typeface = Typeface.DEFAULT_BOLD })
-        layout.addView(text("${clock(pending.detectedAt)} · ${pending.detail}。写下原因，再去完成你的事。", 13f))
+        layout.addView(text("快去睡觉，为什么拿起手机了？我要报告给 ${partnerDisplay} 😠", 20f).apply { typeface = Typeface.DEFAULT_BOLD })
         val input = EditText(this).apply {
-            hint = "例如：忘记背单词了"; setHintTextColor(Color.GRAY); setTextColor(Color.WHITE)
+            hint = "例如：想${partnerDisplay}想得睡不着了 🥺"; setHintTextColor(Color.GRAY); setTextColor(Color.WHITE)
             minLines = 2; maxLines = 5; inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
             setText(pending.reason ?: "")
         }

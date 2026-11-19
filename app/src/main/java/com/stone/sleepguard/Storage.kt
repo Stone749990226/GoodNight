@@ -63,15 +63,26 @@ private val MIGRATION_2_3 = object : Migration(2, 3) {
 }
 
 private val Context.settingsStore by preferencesDataStore("settings")
-data class SleepSettings(val targetBed: Int = 1410, val targetWake: Int = 450, val maxSleepHours: Int = 10)
+data class SleepSettings(val targetBed: Int = 15, val targetWake: Int = 510, val maxSleepHours: Int = 10)
 class SleepPreferences(context: Context) {
     private val store = context.settingsStore
     private val bed = intPreferencesKey("bed")
     private val wake = intPreferencesKey("wake")
     private val maxSleep = intPreferencesKey("maxSleepHours")
-    val flow = store.data.map { SleepSettings(it[bed] ?: 1410, it[wake] ?: 450, it[maxSleep] ?: 10) }
+    private val defaultsVersion = intPreferencesKey("defaultsVersion")
+    val flow = store.data.map { SleepSettings(it[bed] ?: 15, it[wake] ?: 510, it[maxSleep] ?: 10) }
     suspend fun save(value: SleepSettings) {
         store.edit { it[bed] = value.targetBed; it[wake] = value.targetWake; it[maxSleep] = value.maxSleepHours }
+    }
+    /** 旧的默认目标是 23:30/07:30；只把仍停留在旧默认值的用户迁移到 00:15/08:30。 */
+    suspend fun migrateDefaults() {
+        store.edit { p ->
+            if ((p[defaultsVersion] ?: 0) < 1) {
+                if (p[bed] == null || p[bed] == 1410) p[bed] = 15
+                if (p[wake] == null || p[wake] == 450) p[wake] = 510
+                p[defaultsVersion] = 1
+            }
+        }
     }
 }
 

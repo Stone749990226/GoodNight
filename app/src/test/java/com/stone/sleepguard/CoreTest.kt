@@ -80,6 +80,11 @@ class CoreTest {
         assertFalse(partial.configured)
         assertTrue(partial.copy(authCode = "code").configured)
     }
+    @Test fun defaultsAreQuarterPastMidnightAndHalfPastEight() {
+        val settings = SleepSettings()
+        assertEquals(15, settings.targetBed)
+        assertEquals(510, settings.targetWake)
+    }
     @Test fun rolesPairWithEachOther() {
         assertEquals(Role.FANNY, Role.STONE.partner)
         assertEquals(Role.STONE, Role.FANNY.partner)
