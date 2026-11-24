@@ -12,8 +12,8 @@ android {
         applicationId = "com.stone.sleepguard"
         minSdk = 29
         targetSdk = 35
-        versionCode = 27
-        versionName = "0.9.17"
+        versionCode = 29
+        versionName = "0.9.19"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {

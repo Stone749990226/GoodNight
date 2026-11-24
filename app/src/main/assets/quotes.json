@@ -1,5 +1,5 @@
 {
-  "_note": "05:00-18:00 使用 morning；18:00-05:00 使用 evening。每项 text 是正文，source 是出处；可按同样格式增删。",
+  "_note": "05:00-18:00 使用 morning；18:00-05:00 使用 evening。每项 text 是正文，source 是出处；英文引文尽量保留英文原文，经典中译名句可保留中文，其余外语引文用通行中译。可按同样格式增删。",
   "morning": [
     {
       "text": "当待春中，草木蔓发，春山可望，轻鲦出水，白鸥矫翼。",
@@ -10,44 +10,36 @@
       "source": "丘迟《与陈伯之书》"
     },
     {
-      "text": "花开了，就像花睡醒了似的。鸟飞了，就像鸟上天了似的。",
-      "source": "萧红《呼兰河传》"
+      "text": "花开了，就像睡醒了似的。鸟飞了，就像在天上逛似的。",
+      "source": "萧红《呼兰河传》（课文《祖父的园子》，有改动）"
     },
     {
-      "text": "明天又是新的一天。",
-      "source": "电影《乱世佳人》"
-    },
-    {
-      "text": "希望是美好的，也许是人间至善，而美好的事物永不消逝。",
+      "text": "Hope is a good thing, maybe the best of things, and no good thing ever dies.",
       "source": "电影《肖申克的救赎》"
     },
     {
-      "text": "生活就像一盒巧克力，你永远不知道下一颗是什么味道。",
+      "text": "Life was like a box of chocolates. You never know what you're gonna get.",
       "source": "电影《阿甘正传》"
     },
     {
-      "text": "我步入丛林，因为我希望有意识地生活。",
-      "source": "梭罗《瓦尔登湖》（自译）"
+      "text": "I went to the woods because I wished to live deliberately.",
+      "source": "梭罗《瓦尔登湖》"
     },
     {
       "text": "真正的发现之旅，不在于寻找新的风景，而在于拥有新的眼睛。",
-      "source": "普鲁斯特《追忆似水年华》（自译）"
+      "source": "普鲁斯特《追忆似水年华》（意译）"
     },
     {
       "text": "世上只有一种英雄主义，就是在认清生活真相之后依然热爱生活。",
-      "source": "罗曼·罗兰《米开朗琪罗传》（自译）"
+      "source": "罗曼·罗兰《米开朗琪罗传》"
     },
     {
       "text": "一个人知道自己为什么而活，就可以忍受任何一种生活。",
-      "source": "尼采《偶像的黄昏》（自译）"
+      "source": "尼采《偶像的黄昏》"
     },
     {
       "text": "登上顶峰的斗争本身，足以充实一颗人心。必须想象西西弗是幸福的。",
-      "source": "加缪《西西弗神话》（自译）"
-    },
-    {
-      "text": "生活只能倒着被理解，但必须正着被经历。",
-      "source": "克尔凯郭尔《日记》（自译）"
+      "source": "加缪《西西弗神话》"
     },
     {
       "text": "为者常成，行者常至。",
@@ -78,15 +70,7 @@
       "source": "袁宏道《西湖游记》"
     },
     {
-      "text": "人间有味是清欢。",
-      "source": "苏轼《浣溪沙·细雨斜风作晓寒》"
-    },
-    {
-      "text": "此心安处是吾乡。",
-      "source": "苏轼《定风波·南海归赠王定国侍人寓娘》"
-    },
-    {
-      "text": "布衣饭菜，可乐终身。",
+      "text": "布衣菜饭，可乐终身。",
       "source": "沈复《浮生六记》"
     },
     {
@@ -94,52 +78,232 @@
       "source": "《周易·系辞上》"
     },
     {
-      "text": "情之所钟，虽丑不嫌。",
-      "source": "沈复《浮生六记》"
+      "text": "You smiled and talked to me of nothing and I felt that for this I had been waiting long.",
+      "source": "泰戈尔《飞鸟集》"
     },
     {
-      "text": "爱是唯一可以超越时间与空间的事物。",
-      "source": "电影《星际穿越》"
-    },
-    {
-      "text": "如果你驯养了我，我们就会彼此需要。",
-      "source": "圣埃克苏佩里《小王子》（自译）"
-    },
-    {
-      "text": "你微微地笑着，不同我说什么话。而我觉得，为了这个，我已等待得久了。",
-      "source": "泰戈尔《飞鸟集》（自译）"
-    },
-    {
-      "text": "斯人若彩虹，遇上方知有。",
-      "source": "电影《怦然心动》（意译）"
-    },
-    {
-      "text": "假如再也见不到你，祝你早安、午安、晚安。",
-      "source": "电影《楚门的世界》"
-    },
-    {
-      "text": "有些鸟儿是关不住的，它们的羽毛太鲜亮了。",
+      "text": "Some birds aren't meant to be caged. Their feathers are just too bright.",
       "source": "电影《肖申克的救赎》"
     },
     {
       "text": "不要要求事情按你的意愿发生，而要愿意事情如其所是地发生。",
-      "source": "爱比克泰德《手册》（自译）"
+      "source": "爱比克泰德《手册》"
     },
     {
-      "text": "检验一流智力的标准，就是头脑中能同时存在两种相反的想法，却仍能保持行事能力。",
-      "source": "菲茨杰拉德《崩溃》（自译）"
+      "text": "The test of a first-rate intelligence is the ability to hold two opposed ideas in the mind at the same time, and still retain the ability to function.",
+      "source": "菲茨杰拉德《崩溃》"
     },
     {
-      "text": "少则得，多则惑。",
-      "source": "老子《道德经·第二十二章》"
+      "text": "To see the world, things dangerous to come to, to see behind walls, draw closer, to find each other and to feel. That is the purpose of life.",
+      "source": "电影《白日梦想家》"
     },
     {
-      "text": "虚室生白，吉祥止止。",
-      "source": "庄子《人间世》"
+      "text": "天行健，君子以自强不息。",
+      "source": "《周易·乾卦》"
     },
     {
-      "text": "开拓视野，看见世界，贴近彼此，感受生活。",
-      "source": "电影《白日梦想家》（意译）"
+      "text": "地势坤，君子以厚德载物。",
+      "source": "《周易·坤卦》"
+    },
+    {
+      "text": "君子之学也，以美其身。",
+      "source": "《荀子·劝学》"
+    },
+    {
+      "text": "亦余心之所善兮，虽九死其犹未悔。",
+      "source": "屈原《离骚》"
+    },
+    {
+      "text": "大鹏一日同风起，扶摇直上九万里。",
+      "source": "李白《上李邕》"
+    },
+    {
+      "text": "其实地上本没有路，走的人多了，也便成了路。",
+      "source": "鲁迅《故乡》"
+    },
+    {
+      "text": "愿中国青年都摆脱冷气，只是向上走。",
+      "source": "鲁迅《热风·随感录四十一》"
+    },
+    {
+      "text": "生活不能等待别人来安排，要自己去争取和奋斗。",
+      "source": "路遥《平凡的世界》"
+    },
+    {
+      "text": "Hope is the thing with feathers that perches in the soul.",
+      "source": "艾米莉·狄金森《诗集》"
+    },
+    {
+      "text": "The fault, dear Brutus, is not in our stars, but in ourselves.",
+      "source": "莎士比亚《裘力斯·凯撒》"
+    },
+    {
+      "text": "Carpe diem. Seize the day, boys. Make your lives extraordinary.",
+      "source": "电影《死亡诗社》"
+    },
+    {
+      "text": "It is not our abilities that show what we truly are. It is our choices.",
+      "source": "电影《哈利·波特与密室》"
+    },
+    {
+      "text": "The only way to do great work is to love what you do.",
+      "source": "史蒂夫·乔布斯（斯坦福大学毕业典礼演讲）"
+    },
+    {
+      "text": "I think, therefore I am.",
+      "source": "笛卡尔《方法论》"
+    },
+    {
+      "text": "The unexamined life is not worth living.",
+      "source": "柏拉图《申辩篇》"
+    },
+    {
+      "text": "Waste no more time arguing about what a good man should be. Be one.",
+      "source": "马可·奥勒留《沉思录》"
+    },
+    {
+      "text": "Sapere aude! Have courage to use your own understanding.",
+      "source": "康德《答复这个问题：什么是启蒙运动？》"
+    },
+    {
+      "text": "We suffer more often in imagination than in reality.",
+      "source": "塞涅卡《致鲁基里乌斯书信》"
+    },
+    {
+      "text": "That which does not kill us makes us stronger.",
+      "source": "尼采《偶像的黄昏》"
+    },
+    {
+      "text": "What we call the beginning is often the end. And to make an end is to make a beginning.",
+      "source": "T.S.艾略特《四个四重奏》"
+    },
+    {
+      "text": "Nothing great was ever achieved without enthusiasm.",
+      "source": "爱默生《论文集》"
+    },
+    {
+      "text": "Get busy living, or get busy dying.",
+      "source": "电影《肖申克的救赎》"
+    },
+    {
+      "text": "Do, or do not. There is no try.",
+      "source": "电影《星球大战：帝国反击战》"
+    },
+    {
+      "text": "Why do we fall, sir? So that we can learn to pick ourselves up.",
+      "source": "电影《蝙蝠侠：侠影之谜》"
+    },
+    {
+      "text": "记住该记住的，忘记该忘记的。改变能改变的，接受不能改变的。",
+      "source": "塞林格《麦田里的守望者》"
+    },
+    {
+      "text": "物竞天择，适者生存。",
+      "source": "严复《天演论》"
+    },
+    {
+      "text": "人不是为失败而生的，一个人可以被毁灭，但不能被打败。",
+      "source": "海明威《老人与海》"
+    },
+    {
+      "text": "我年纪还轻、阅历不深的时候，我父亲教导过我一句话，我至今还念念不忘。每逢你想要批评任何人的时候，他对我说，你就记住这个世界上所有的人，并不是个个都有过你拥有的那些优越条件。",
+      "source": "菲茨杰拉德《了不起的盖茨比》"
+    },
+    {
+      "text": "认识自己的无知是认识世界的最可靠的方法。",
+      "source": "蒙田《随笔集》"
+    },
+    {
+      "text": "如果冬天来了，春天还会远吗？",
+      "source": "雪莱《西风颂》"
+    },
+    {
+      "text": "谁都可能出个错儿，你在一件事情上越琢磨得多就越容易出错。",
+      "source": "哈谢克《好兵帅克历险记》"
+    },
+    {
+      "text": "不要向井里吐痰，也许你还会来喝井里的水。",
+      "source": "肖洛霍夫《静静的顿河》"
+    },
+    {
+      "text": "一个人只要有意志力，就能超越他的环境。",
+      "source": "杰克·伦敦《马丁·伊登》"
+    },
+    {
+      "text": "宽宏大量，是唯一能够照亮伟大灵魂的光芒。",
+      "source": "雨果《巴黎圣母院》"
+    },
+    {
+      "text": "从现在起，我开始谨慎地选择我的生活，我不再轻易让自己迷失在各种诱惑里。我心中已经听到来自远方的呼唤，再不需要回过头去关心身后的种种是非与议论。我已无暇顾及过去，我要向前走。",
+      "source": "米兰·昆德拉《不能承受的生命之轻》"
+    },
+    {
+      "text": "侈则多欲。君子多欲则贪慕富贵，枉道速祸。",
+      "source": "司马光《训俭示康》"
+    },
+    {
+      "text": "一切为了社会主义的这种人是最幸福的人。",
+      "source": "徐特立"
+    },
+    {
+      "text": "生当作人杰，死亦为鬼雄。至今思项羽，不肯过江东。",
+      "source": "李清照《夏日绝句》"
+    },
+    {
+      "text": "春是自然界一年中的新生季节，而人生的新生季节，就是一生只有一度的青春。",
+      "source": "西塞罗"
+    },
+    {
+      "text": "天真不必有所作为也一样高尚的。它无论是穿着破衣烂裤，或贵为公子王孙，总是同样尊贵的。",
+      "source": "雨果"
+    },
+    {
+      "text": "人们在一起可以做出单独一个人所不能做出的事业；智慧、双手、力量结合在一起，几乎是万能的。",
+      "source": "韦伯斯特"
+    },
+    {
+      "text": "读书不是为了雄辩和驳斥，也不是为了轻信和盲从，而是为了思考和权衡。",
+      "source": "培根《随笔集》"
+    },
+    {
+      "text": "存在着一种出自内心的礼貌。它是变换了形式的爱心。由此产生出一种外部表现出来的最适宜的礼貌。",
+      "source": "歌德"
+    },
+    {
+      "text": "所虑时光疾，常怀紧迫情。蹒跚行步慢，落后最宜鞭。",
+      "source": "董必武"
+    },
+    {
+      "text": "这世界没有真相，只有视角。",
+      "source": "尼采《遗稿》（意译）"
+    },
+    {
+      "text": "谁终将声震人间，必长久深自缄默。谁终将点燃闪电，必长久如云漂泊。",
+      "source": "尼采《尼采诗选》"
+    },
+    {
+      "text": "我们的需要越少，我们越近似神。",
+      "source": "苏格拉底"
+    },
+    {
+      "text": "往外张望的人在做梦，向内审视的人才清醒。",
+      "source": "卡尔·荣格"
+    },
+    {
+      "text": "人是生而自由的，但却无往不在枷锁之中。",
+      "source": "卢梭《社会契约论》"
+    },
+    {
+      "text": "自由的保证是什么？是不再对自己感到羞耻。",
+      "source": "尼采《快乐的科学》"
+    },
+    {
+      "text": "We read the world wrong and say that it deceives us.",
+      "source": "泰戈尔《飞鸟集》"
+    },
+    {
+      "text": "每一个不曾起舞的日子，都是对生命的辜负。",
+      "source": "尼采《查拉图斯特拉如是说》"
     }
   ],
   "evening": [
@@ -240,56 +404,280 @@
       "source": "苏轼《定风波·南海归赠王定国侍人寓娘》"
     },
     {
-      "text": "布衣饭菜，可乐终身。",
-      "source": "沈复《浮生六记》"
-    },
-    {
       "text": "情之所钟，虽丑不嫌。",
       "source": "沈复《浮生六记》"
     },
     {
-      "text": "二人同心，其利断金；同心之言，其臭如兰。",
-      "source": "《周易·系辞上》"
-    },
-    {
-      "text": "爱是唯一可以超越时间与空间的事物。",
+      "text": "Love is the one thing that transcends time and space.",
       "source": "电影《星际穿越》"
     },
     {
       "text": "如果你驯养了我，我们就会彼此需要。",
-      "source": "圣埃克苏佩里《小王子》（自译）"
-    },
-    {
-      "text": "你微微地笑着，不同我说什么话。而我觉得，为了这个，我已等待得久了。",
-      "source": "泰戈尔《飞鸟集》（自译）"
+      "source": "圣埃克苏佩里《小王子》"
     },
     {
       "text": "斯人若彩虹，遇上方知有。",
       "source": "电影《怦然心动》（意译）"
     },
     {
-      "text": "假如再也见不到你，祝你早安、午安、晚安。",
+      "text": "In case I don't see ya, good afternoon, good evening, and good night.",
       "source": "电影《楚门的世界》"
     },
     {
-      "text": "明天又是新的一天。",
+      "text": "After all, tomorrow is another day.",
       "source": "电影《乱世佳人》"
     },
     {
-      "text": "希望是美好的，也许是人间至善，而美好的事物永不消逝。",
-      "source": "电影《肖申克的救赎》"
-    },
-    {
       "text": "生活只能倒着被理解，但必须正着被经历。",
-      "source": "克尔凯郭尔《日记》（自译）"
+      "source": "克尔凯郭尔《日记》"
     },
     {
-      "text": "兰生幽谷，不为莫服而不芳。",
-      "source": "《淮南子·说山训》"
+      "text": "行到水穷处，坐看云起时。",
+      "source": "王维《终南别业》"
     },
     {
-      "text": "草木有本心，何求美人折！",
-      "source": "张九龄《感遇·其一》"
+      "text": "众里寻他千百度，蓦然回首，那人却在，灯火阑珊处。",
+      "source": "辛弃疾《青玉案·元夕》"
+    },
+    {
+      "text": "江天一色无纤尘，皎皎空中孤月轮。",
+      "source": "张若虚《春江花月夜》"
+    },
+    {
+      "text": "山气日夕佳，飞鸟相与还。",
+      "source": "陶渊明《饮酒·其五》"
+    },
+    {
+      "text": "此中有真意，欲辨已忘言。",
+      "source": "陶渊明《饮酒·其五》"
+    },
+    {
+      "text": "何当共剪西窗烛，却话巴山夜雨时。",
+      "source": "李商隐《夜雨寄北》"
+    },
+    {
+      "text": "素月分辉，明河共影，表里俱澄澈。",
+      "source": "张孝祥《念奴娇·过洞庭》"
+    },
+    {
+      "text": "小楼一夜听春雨，深巷明朝卖杏花。",
+      "source": "陆游《临安春雨初霁》"
+    },
+    {
+      "text": "回首向来萧瑟处，归去，也无风雨也无晴。",
+      "source": "苏轼《定风波·莫听穿林打叶声》"
+    },
+    {
+      "text": "人生如逆旅，我亦是行人。",
+      "source": "苏轼《临江仙·送钱穆父》"
+    },
+    {
+      "text": "小舟从此逝，江海寄余生。",
+      "source": "苏轼《临江仙·夜饮东坡醒复醉》"
+    },
+    {
+      "text": "曲径通幽处，禅房花木深。",
+      "source": "常建《题破山寺后禅院》"
+    },
+    {
+      "text": "被酒莫惊春睡重，赌书消得泼茶香。当时只道是寻常。",
+      "source": "纳兰性德《浣溪沙·谁念西风独自凉》"
+    },
+    {
+      "text": "云中谁寄锦书来？雁字回时，月满西楼。",
+      "source": "李清照《一剪梅·红藕香残玉簟秋》"
+    },
+    {
+      "text": "We are all in the gutter, but some of us are looking at the stars.",
+      "source": "奥斯卡·王尔德《温德米尔夫人的扇子》"
+    },
+    {
+      "text": "We are such stuff as dreams are made on, and our little life is rounded with a sleep.",
+      "source": "莎士比亚《暴风雨》"
+    },
+    {
+      "text": "Good night, good night! Parting is such sweet sorrow, that I shall say good night till it be morrow.",
+      "source": "莎士比亚《罗密欧与朱丽叶》"
+    },
+    {
+      "text": "Be patient toward all that is unsolved in your heart and try to love the questions themselves.",
+      "source": "里尔克《给青年诗人的信》"
+    },
+    {
+      "text": "In the depth of winter, I finally learned that within me there lay an invincible summer.",
+      "source": "加缪《重返蒂巴萨》"
+    },
+    {
+      "text": "The owl of Minerva spreads its wings only with the falling of the dusk.",
+      "source": "黑格尔《法哲学原理》"
+    },
+    {
+      "text": "Two things fill the mind with ever new and increasing admiration and awe... the starry heavens above me and the moral law within me.",
+      "source": "康德《实践理性批判》"
+    },
+    {
+      "text": "I have loved the stars too fondly to be fearful of the night.",
+      "source": "莎拉·威廉姆斯《老天文学家》"
+    },
+    {
+      "text": "Forever is composed of nows.",
+      "source": "艾米莉·狄金森《诗集》"
+    },
+    {
+      "text": "Happiness can be found even in the darkest of times, if one only remembers to turn on the light.",
+      "source": "电影《哈利·波特与阿兹卡班的囚徒》"
+    },
+    {
+      "text": "We shall not cease from exploration, and the end of all our exploring will be to arrive where we started and know the place for the first time.",
+      "source": "T.S.艾略特《四个四重奏》"
+    },
+    {
+      "text": "The limits of my language mean the limits of my world.",
+      "source": "维特根斯坦《逻辑哲学论》"
+    },
+    {
+      "text": "All things excellent are as difficult as they are rare.",
+      "source": "斯宾诺莎《伦理学》"
+    },
+    {
+      "text": "Without music, life would be a mistake.",
+      "source": "尼采《偶像的黄昏》"
+    },
+    {
+      "text": "Man is condemned to be free.",
+      "source": "萨特《存在主义是一种人道主义》"
+    },
+    {
+      "text": "It's not who I am underneath, but what I do that defines me.",
+      "source": "电影《蝙蝠侠：侠影之谜》"
+    },
+    {
+      "text": "Life finds a way.",
+      "source": "电影《侏罗纪公园》"
+    },
+    {
+      "text": "生活不可能像你想象得那么好，但也不会像你想象得那么糟。",
+      "source": "莫泊桑《一生》"
+    },
+    {
+      "text": "命运总是不如人愿。但往往是在无数的痛苦中，在重重的矛盾和艰辛中，才使人成熟起来。",
+      "source": "路遥《平凡的世界》"
+    },
+    {
+      "text": "人永远都无法知道自己该要什么，因为人只能活一次，既不能拿它跟前世相比，也不能在来生加以修正。没有任何方法可以检验哪种抉择是好的，因为不存在任何比较。一切都是马上经历，仅此一次，不能准备。迷途漫漫，终有一归。",
+      "source": "米兰·昆德拉《不能承受的生命之轻》"
+    },
+    {
+      "text": "世界上有这样一些幸福的人，他们把自己的痛苦化作他人的幸福，他们挥泪埋葬了自己在尘世间的希望，它却变成了种子，长出鲜花和香膏，为孤苦伶仃的苦命人医治创伤。",
+      "source": "斯托夫人《汤姆叔叔的小屋》"
+    },
+    {
+      "text": "在别人心中存在的人，就是这个人的灵魂。这才是您本身，才是您的意识在一生当中赖以呼吸、营养以至陶醉的东西，这也就是您的灵魂、您的不朽和存在于别人身上的您的生命。",
+      "source": "帕斯捷尔纳克《日瓦戈医生》"
+    },
+    {
+      "text": "有一个传说，说的是有那么一只鸟儿，它一生只唱一次，那歌声比世上所有一切生灵的歌声都更加优美动听。",
+      "source": "考琳·麦卡洛《荆棘鸟》"
+    },
+    {
+      "text": "离你越近的地方，路途越远；最简单的音调，需要最艰苦的练习。",
+      "source": "泰戈尔《泰戈尔诗选》"
+    },
+    {
+      "text": "悲伤使人格外敏锐。",
+      "source": "罗曼·罗兰《约翰·克利斯朵夫》"
+    },
+    {
+      "text": "现在我住在波勒兹别墅，这里找不到一点儿灰尘，也没有一件东西摆得不是地方，除了我们，这里再没有别人，我们死了。",
+      "source": "亨利·米勒《北回归线》"
+    },
+    {
+      "text": "遭受苦难的人在承受痛楚时并不能觉察到其剧烈的程度，反倒是过后延绵的折磨最能使其撕心裂肺。",
+      "source": "霍桑《红字》"
+    },
+    {
+      "text": "星星发亮是为了让每一个人有一天都能找到属于自己的星星。",
+      "source": "圣埃克苏佩里《小王子》"
+    },
+    {
+      "text": "唯有身处卑微的人，最有机缘看到世态人情的真相。一个人不想攀高就不怕下跌，也不用倾轧排挤，可以保其天真，成其自然，潜心一志完成自己能做的事。",
+      "source": "杨绛《我们仨》"
+    },
+    {
+      "text": "我行过许多地方的桥，看过许多次数的云，喝过许多种类的酒，却只爱过一个正当最好年龄的人。",
+      "source": "沈从文《湘行书简》"
+    },
+    {
+      "text": "我爱的人，我要能够占领他整个生命，他在碰见我以前，没有过去，留着空白等待我。",
+      "source": "钱钟书《围城》"
+    },
+    {
+      "text": "我一生渴望被人收藏好，妥善安放，细心保存。免我惊，免我苦，免我四下流离，免我无枝可依。",
+      "source": "匡匡《时有女子》"
+    },
+    {
+      "text": "生命从来不曾离开过孤独而独立存在。无论是我们出生、我们成长、我们相爱还是我们成功失败，直到最后的最后，孤独犹如影子一样存在于生命一隅。",
+      "source": "加西亚·马尔克斯《百年孤独》"
+    },
+    {
+      "text": "为什么我们总是意识不到爱情何时开始，却总是知道何时结束？",
+      "source": "史蒂夫·马丁（电影《洛城故事》）"
+    },
+    {
+      "text": "金钱只是在数量失去均衡时，才是一种权力。",
+      "source": "巴尔扎克"
+    },
+    {
+      "text": "道德判你死刑，哲学证你无罪。",
+      "source": "加缪《局外人》（意译）"
+    },
+    {
+      "text": "所谓辉煌的人生，不过是欲望的囚徒。",
+      "source": "叔本华"
+    },
+    {
+      "text": "历史是一堆灰烬，但灰烬深处有余温。",
+      "source": "黑格尔《美学》"
+    },
+    {
+      "text": "他人即地狱。",
+      "source": "萨特《禁闭》"
+    },
+    {
+      "text": "向死而生的意义是：当你无限接近死亡，才能深切体会生的意义。",
+      "source": "海德格尔《存在与时间》（意译）"
+    },
+    {
+      "text": "使人疲惫的不是远方的高山，而是鞋子里的一粒沙子。",
+      "source": "伏尔泰"
+    },
+    {
+      "text": "与恶龙缠斗过久，自身亦成为恶龙；凝视深渊过久，深渊将回以凝视。",
+      "source": "尼采《善恶的彼岸》"
+    },
+    {
+      "text": "在孤独中，孤独者将自己吃得一干二净。而在群体中，他被众人吃掉。",
+      "source": "尼采《人性的，太人性的》"
+    },
+    {
+      "text": "除了没用的肉体自杀和精神逃避，第三种自杀的态度是坚持奋斗，对抗人生的荒谬。",
+      "source": "加缪《加缪手记》"
+    },
+    {
+      "text": "要求别人爱自己，是最大的傲慢。",
+      "source": "尼采《与孤独为伍》"
+    },
+    {
+      "text": "雪崩时，没有一片雪花觉得自己有责任。",
+      "source": "斯坦尼斯瓦夫·莱克《思绪纷乱》"
+    },
+    {
+      "text": "没有对生活的绝望，就不会爱生活。",
+      "source": "加缪《反与正·热爱生活》"
+    },
+    {
+      "text": "没有可怕的深度，就没有美丽的水面。",
+      "source": "尼采《遗稿选》"
     }
   ]
 }
