@@ -13,6 +13,7 @@ import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -37,7 +38,9 @@ internal fun TonightScreen(active: NightRecord?, lastAwake: NightRecord?, now: L
             val size = (maxWidth.value / 3.1f / scale).coerceAtMost(76f)
             Text(clock(now), fontSize = size.sp, fontWeight = FontWeight.Light, letterSpacing = (-3).sp, color = Cream, lineHeight = (size * 1.18f).sp)
         }
-        Text(Phase.label(active?.night?.phase ?: lastAwake?.night?.phase), fontSize = 14.sp, color = Muted)
+        val phase = active?.night?.phase ?: lastAwake?.night?.phase
+        Text(if (phase == Phase.AWAKE) DailyQuotes.current(context) else Phase.label(phase),
+            fontSize = 14.sp, color = Muted, lineHeight = 21.sp, textAlign = TextAlign.Center)
     }
     SoftCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -160,6 +160,12 @@
 - 0.9.13 / 0.9.14（versionCode 23 / 24）已安装到 vivo X100s Pro；`testDebugUnitTest` 13 项、`lintDebug`、`assembleDebug` 通过。
 - 0.9.15：删除记录页「点表格里的任意一晚，跳到下面的详情」说明文字；后续不再添加此类操作说明。
 
+## 0.9.16 首页清晨/晚上轮播文字
+
+- 新增 `app/src/main/assets/quotes.json`：`morning` 35 条、`evening` 37 条；05:00–18:00 用清晨池，18:00–05:00 用晚上池，按日期固定轮换，同一天同一时段同一条。
+- 首页原本显示「今天也要开心」的位置改为读取轮播文字；文件缺失、为空或解析失败时回退原文案。已在手机 17:56 验证显示「人须在事上磨，方立得住。」。
+- 0.9.16（versionCode 26）已安装到 vivo X100s Pro；`testDebugUnitTest` 13 项、`lintDebug`、`assembleDebug` 通过。
+
 ## 用户实测与验收范围调整
 
 - 用户已在 vivo 上亲自测试拿起/倾斜检测，并明确将此检查视为完成。
