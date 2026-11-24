@@ -78,7 +78,6 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
             jumpTarget = id
             jumpTick++
         }
-        Text("点表格里的任意一晚，跳到下面的详情。", color = Muted, fontSize = 11.sp)
         selected.forEach { record ->
             RecordCard(record, onFeeling, onPhoto, onShare, onReason,
                 onEdit = { editingId = record.night.id }, onDelete = { deletingId = record.night.id },
