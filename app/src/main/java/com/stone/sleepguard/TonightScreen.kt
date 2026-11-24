@@ -110,6 +110,11 @@ internal fun ReasonEditor(pending: Interruption, onReason: (Long, String) -> Uni
     var text by rememberSaveable(pending.id) { mutableStateOf("") }
     Text("${clock(pending.detectedAt)} · 怎么啦？", color = Muted, fontSize = 12.sp)
     OutlinedTextField(value = text, onValueChange = { text = it }, placeholder = { Text("告诉我为什么又拿起手机，写下来才能继续睡哦") },
-        modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 5, shape = RoundedCornerShape(16.dp))
+        modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 5, shape = RoundedCornerShape(16.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = Panel, unfocusedContainerColor = Panel,
+            focusedTextColor = Cream, unfocusedTextColor = Cream,
+            focusedPlaceholderColor = Muted, unfocusedPlaceholderColor = Muted,
+            focusedBorderColor = Mint, unfocusedBorderColor = Color(0xFF3B505C), cursorColor = Mint))
     Button(onClick = { onReason(pending.id, text) }, enabled = text.isNotBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("写好了，继续睡") }
 }

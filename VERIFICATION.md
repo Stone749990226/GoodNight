@@ -176,6 +176,7 @@
 - 0.9.20：中断填完原因后 10 分钟未重新晚安，服务自动恢复为 SETTLING 并重新布防；自动恢复不发「再次晚安」邮件。手动 10 分钟内点晚安仍发送。
 - 0.9.20（versionCode 30）已安装到 vivo X100s Pro；`testDebugUnitTest` 13 项、`lintDebug`、`assembleDebug` 通过。
 - 0.9.21：「不足1小时，本次不记录」在主页也改为 Toast，和邮件发送提示一致；不再走底部 Snackbar。
+- 0.9.22：「记录原因」输入框改为深色底 `#0D171F`、薄荷描边，提示文字改灰蓝；悬浮层 EditText 和 App 内 OutlinedTextField 同步。
 
 ## 用户实测与验收范围调整
 

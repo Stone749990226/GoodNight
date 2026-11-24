@@ -487,13 +487,24 @@ class MonitorService : Service(), SensorEventListener {
         fun text(value: String, size: Float = 16f) = TextView(this).apply { text = value; textSize = size; setTextColor(Color.rgb(226, 239, 233)); setPadding(0, 0, 0, dp(12)) }
         layout.addView(text("快去睡觉，为什么拿起手机了？我要报告给 ${partnerDisplay} 😠", 20f).apply { typeface = Typeface.DEFAULT_BOLD })
         val input = EditText(this).apply {
-            hint = "例如：想${partnerDisplay}想得睡不着了 🥺"; setHintTextColor(Color.GRAY); setTextColor(Color.WHITE)
+            hint = "例如：想${partnerDisplay}想得睡不着了 🥺"
+            setHintTextColor(Color.rgb(159, 178, 185)); setTextColor(Color.rgb(232, 239, 233))
             minLines = 2; maxLines = 5; inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
             setText(pending.reason ?: "")
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.rgb(13, 23, 31)); cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), Color.rgb(46, 71, 82))
+            }
+            setPadding(dp(14), dp(10), dp(14), dp(10))
         }
         layout.addView(input, LinearLayout.LayoutParams(-1, dp(130)))
         val error = text("", 13f); layout.addView(error)
-        val submit = Button(this).apply { text = "记录原因"; isAllCaps = false }
+        val submit = Button(this).apply {
+            text = "记录原因"; isAllCaps = false; textSize = 16f
+            setTextColor(Color.rgb(13, 23, 31))
+            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(168, 220, 203))
+            stateListAnimator = null
+        }
         layout.addView(submit, LinearLayout.LayoutParams(-1, dp(56)))
         submit.setOnClickListener {
             if (input.text.toString().isBlank()) { error.text = "请手动填写原因"; return@setOnClickListener }
