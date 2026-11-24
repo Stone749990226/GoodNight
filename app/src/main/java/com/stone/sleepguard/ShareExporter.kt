@@ -85,7 +85,7 @@ class ShareExporter(private val context: Context, private val partner: String = 
             }
             y += 20
         }
-        paragraph("就寝时间为本人声明；记录间隔不等于真实睡眠。", 22f, muted)
+        paragraph("记录间隔不等于真实睡眠。", 22f, muted)
         paragraph("晚安，分享给 $partner", 23f, mint)
         finish()
         return files

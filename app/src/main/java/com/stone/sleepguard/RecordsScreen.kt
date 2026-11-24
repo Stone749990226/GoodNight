@@ -165,7 +165,7 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
         if (record.overslept) Text("超过设定的最多睡眠时长（${record.night.maxSleepMinutes / 60} 小时），未计入平均。", color = Amber, fontSize = 12.sp)
         if (expanded) {
             HorizontalDivider(color = Color(0xFF30424C))
-            Text("首次晚安 ${clock(record.night.firstSleepAt)}\n最终就寝 ${clock(record.finalBedAt)}（本人声明）\n末次灭屏 ${clock(record.lastScreenOff)} · 晨起解锁参考 ${clock(record.morningUnlock)}\n记录间隔 ${intervalText(record.interval)}", color = Muted, fontSize = 13.sp, lineHeight = 24.sp)
+            Text("首次晚安 ${clock(record.night.firstSleepAt)}\n最终就寝 ${clock(record.finalBedAt)}\n末次灭屏 ${clock(record.lastScreenOff)} · 晨起解锁参考 ${clock(record.morningUnlock)}\n记录间隔 ${intervalText(record.interval)}", color = Muted, fontSize = 13.sp, lineHeight = 24.sp)
             record.interruptions.sortedBy { it.detectedAt }.forEach { i ->
                 if (i.morning) Text("${clock(i.detectedAt)} · 起床操作", color = Mint, fontSize = 13.sp)
                 else {

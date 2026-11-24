@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-/** 事件邮件的模板与入队。邮件只含本人声明、时间和原因，不含传感器原始数据。 */
+/** 事件邮件的模板与入队。邮件只含晚安/醒来标记、时间和原因，不含传感器原始数据。 */
 object EmailNotifier {
     private data class Payload(val kind: String, val subject: String, val body: String)
 

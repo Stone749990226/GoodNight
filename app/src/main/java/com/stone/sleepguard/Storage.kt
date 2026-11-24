@@ -127,7 +127,7 @@ class SleepRepository(private val context: Context) {
                     maxSleepMinutes = settings.maxSleepHours * 60))
                 current.night.id
             }
-            dao.insert(NightEvent(nightId = id, at = now, type = "SLEEP", detail = "本人点击我去睡了；15秒后开始检测"))
+            dao.insert(NightEvent(nightId = id, at = now, type = "SLEEP", detail = "点击我去睡了；15秒后开始检测"))
             id
         }
         dao.record(id)?.let { EmailNotifier.sleep(context, it, again = !created) }
@@ -181,7 +181,7 @@ class SleepRepository(private val context: Context) {
         }
         db.withTransaction {
             dao.update(record.night.copy(phase = Phase.AWAKE, wakeAt = now, heartbeatAt = now))
-            dao.insert(NightEvent(nightId = record.night.id, at = now, type = "WAKE", detail = "本人点击醒了；监控结束"))
+            dao.insert(NightEvent(nightId = record.night.id, at = now, type = "WAKE", detail = "点击我醒了；监控结束"))
         }
         record.night.id
     }

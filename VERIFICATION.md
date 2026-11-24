@@ -153,6 +153,11 @@
 - App 启动时执行一次清理：删除历史中醒来时间 − 首次晚安时间 < 60 分钟的记录。
 - 0.9.12（versionCode 22）已安装到 vivo X100s Pro；`testDebugUnitTest` 13 项、`lintDebug`、`assembleDebug` 通过。
 
+## 0.9.13 删除“本人声明”措辞
+
+- 记录详情去掉「（本人声明）」；首页说明改为「记录间隔不等于实际睡眠」；分享图只保留「记录间隔不等于真实睡眠」；晚安/醒来事件文案和邮件注释中的「本人」一并删除。
+- 0.9.13（versionCode 23）已安装到 vivo X100s Pro；`testDebugUnitTest` 13 项、`lintDebug`、`assembleDebug` 通过。
+
 ## 用户实测与验收范围调整
 
 - 用户已在 vivo 上亲自测试拿起/倾斜检测，并明确将此检查视为完成。
