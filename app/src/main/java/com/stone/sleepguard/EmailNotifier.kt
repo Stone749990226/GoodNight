@@ -48,7 +48,7 @@ object EmailNotifier {
         }.ifBlank { "  · 无" }
         val result = when {
             !record.valid && record.overslept -> "未计入有效记录（超过设定的最长睡眠时长）"
-            !record.valid -> "未计入有效记录（有监控缺口或中断）"
+            !record.valid -> "未计入有效记录（有监控缺口）"
             bedMinutes(record.finalBedAt!!) <= bedGoal(record.night.targetBed) &&
                 localMinutes(wake) <= record.night.targetWake -> "达标"
             else -> "未达标"

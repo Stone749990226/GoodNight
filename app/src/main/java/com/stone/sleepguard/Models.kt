@@ -89,10 +89,17 @@ data class NightRecord(
 ) {
     val disruptions get() = interruptions.filterNot { it.morning }.sortedBy { it.detectedAt }
     val pending get() = disruptions.lastOrNull { it.reason.isNullOrBlank() }
-    val finalBedAt: Long? get() = night.lastSleepAt.takeIf { t -> disruptions.none { it.detectedAt >= t } }
+    val finalBedAt: Long? get() {
+        val lastSleep = night.lastSleepAt
+        return disruptions.asSequence()
+            .filter { it.detectedAt >= lastSleep }
+            .mapNotNull { it.returnedAt }
+            .filter { it >= lastSleep }
+            .maxOrNull() ?: lastSleep
+    }
     val hasGap get() = events.any { it.type == "GAP" }
     val overslept get() = interval?.let { it > night.maxSleepMinutes.coerceAtLeast(60) * 60_000L } == true
-    val valid get() = night.wakeAt != null && finalBedAt != null && !hasGap && !overslept
+    val valid get() = night.wakeAt != null && !hasGap && !overslept
     val interval: Long? get() = finalBedAt?.let { bed -> night.wakeAt?.let { (it - bed).coerceAtLeast(0) } }
     val lastScreenOff get() = events.filter { it.type == "SCREEN_OFF" && it.at >= night.lastSleepAt && it.at <= (night.wakeAt ?: Long.MAX_VALUE) }.maxByOrNull { it.at }?.at
     val morningUnlock get() = night.wakeAt?.let { wake -> events.filter { it.type == "UNLOCK" && it.at in (wake - 300_000)..wake }.maxByOrNull { it.at }?.at }

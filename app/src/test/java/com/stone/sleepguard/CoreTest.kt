@@ -20,13 +20,20 @@ class CoreTest {
         val results = (1600L..4000L step 100).map { detector.sample(0f, 8.5f, 4.9f, it, true) }
         assertTrue(results.any { it != null })
     }
-    @Test fun interruptedSleepIsNotInventedAndMorningMovementIsExcluded() {
+    @Test fun interruptedSleepUsesTheLastReturnTimeAsFinalBed() {
         val night = Night(id = 1, date = "2026-10-19", firstSleepAt = 1000, lastSleepAt = 1000,
             targetBed = 1410, targetWake = 450, wakeAt = 10000, phase = Phase.AWAKE)
-        val event = Interruption(id = 1, nightId = 1, detectedAt = 2000, reason = "背单词")
-        assertNull(NightRecord(night, listOf(event), emptyList()).finalBedAt)
+        val event = Interruption(id = 1, nightId = 1, detectedAt = 2000, reason = "背单词", returnedAt = 3000)
+        assertEquals(3000L, NightRecord(night, listOf(event), emptyList()).finalBedAt)
         assertEquals(1000L, NightRecord(night, listOf(event.copy(morning = true)), emptyList()).finalBedAt)
-        assertEquals(3000L, NightRecord(night.copy(lastSleepAt = 3000), listOf(event), emptyList()).finalBedAt)
+        assertEquals(4000L, NightRecord(night.copy(lastSleepAt = 4000), listOf(event), emptyList()).finalBedAt)
+    }
+    @Test fun editedBedTimeWinsWhenItIsLaterThanTheInterruptionReturn() {
+        val night = Night(id = 2, date = "2026-11-19", firstSleepAt = 1000, lastSleepAt = 2000,
+            targetBed = 1410, targetWake = 450, wakeAt = 10000, phase = Phase.AWAKE)
+        val interruption = Interruption(id = 1, nightId = 2, detectedAt = 5000, reason = "测试", returnedAt = 6000)
+        assertEquals(6000L, NightRecord(night, listOf(interruption), emptyList()).finalBedAt)
+        assertEquals(7000L, NightRecord(night.copy(lastSleepAt = 7000), listOf(interruption), emptyList()).finalBedAt)
     }
     @Test fun midnightBelongsToPreviousEveningAndAveragesDoNotWrapToNoon() {
         val zone = ZoneId.of("Asia/Shanghai")
@@ -48,13 +55,6 @@ class CoreTest {
         assertNull(parseClock("24:00"))
         assertNull(parseClock("23:70"))
         assertTrue(wake > bed)
-    }
-    @Test fun editedBedLaterThanInterruptionLeavesNightIncomplete() {
-        val night = Night(id = 2, date = "2026-11-19", firstSleepAt = 1000, lastSleepAt = 2000,
-            targetBed = 1410, targetWake = 450, wakeAt = 10000, phase = Phase.AWAKE)
-        val interruption = Interruption(id = 1, nightId = 2, detectedAt = 5000, reason = "测试")
-        assertNull(NightRecord(night, listOf(interruption), emptyList()).finalBedAt)
-        assertNotNull(NightRecord(night.copy(lastSleepAt = 6000), listOf(interruption), emptyList()).finalBedAt)
     }
     @Test fun fixedHighSensitivityDetectsFifteenDegreeTilt() {
         val detector = MotionDetector()
