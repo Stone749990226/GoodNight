@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -104,7 +105,7 @@ class MainActivity : ComponentActivity() {
                     runAction {
                         val id = app.repository.wake()
                         MonitorService.releaseNow(); stopService(Intent(this@MainActivity, MonitorService::class.java))
-                        if (id == SleepRepository.SHORT_NIGHT) app.message.value = "不足1小时，本次不记录" else feelingId = id
+                        if (id == SleepRepository.SHORT_NIGHT) toast("不足1小时，本次不记录") else feelingId = id
                     }
                 }
                 val active = records.firstOrNull { it.night.phase != Phase.AWAKE }
@@ -190,6 +191,7 @@ class MainActivity : ComponentActivity() {
         app.scope.launch { busy.value = true; try { block() } catch (e: Exception) { app.message.value = e.message ?: "操作失败，请再试一次" } finally { busy.value = false } }
     }
     private fun openSettings(intent: Intent) { runCatching { startActivity(intent) }.onFailure { app.message.value = "请在系统设置的应用管理中打开晚安" } }
+    private fun toast(text: String) { Toast.makeText(this, text, Toast.LENGTH_SHORT).show() }
     private fun openBackgroundSettings() {
         val packagePage = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
         val candidates = when (Build.MANUFACTURER.lowercase()) {
