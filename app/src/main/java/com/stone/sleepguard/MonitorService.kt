@@ -41,6 +41,8 @@ class MonitorService : Service(), SensorEventListener {
     private var reminderNightId: Long? = null
     private var overlayIsMorning = false
     private var partnerDisplay = "对方"
+    private var morningFeelingPending = false
+    private var morningSnoozeAt = 0L
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val type = when (intent.action) {
@@ -53,7 +55,14 @@ class MonitorService : Service(), SensorEventListener {
             }
             scope.launch { repo.event(type) }
             if (type == "SCREEN_OFF") removeOverlay()
-            if (type == "UNLOCK" || type == "SCREEN_ON") scope.launch { delay(350); showPending(); showMorningPrompt() }
+            if (type == "UNLOCK" || type == "SCREEN_ON") scope.launch {
+                delay(350)
+                if (morningFeelingPending) {
+                    if (morningCooldownActive()) return@launch
+                    if (showWakeQuestion()) return@launch
+                }
+                showPending(); showMorningPrompt()
+            }
         }
     }
 
@@ -86,6 +95,8 @@ class MonitorService : Service(), SensorEventListener {
                     morningNotified = false
                     oversleptNotified = false
                     lastMorningPromptAt = 0L
+                    morningFeelingPending = false
+                    morningSnoozeAt = 0L
                     if (it == null) getSystemService(NotificationManager::class.java).cancel(MORNING_NOTIFICATION)
                 }
                 configure(); showPending()
@@ -180,7 +191,17 @@ class MonitorService : Service(), SensorEventListener {
         val detail = detector?.sample(event.values[0], event.values[1], event.values[2], event.timestamp / 1_000_000, armed)
         if (detail != null && armed) {
             detecting = true
-            scope.launch {
+            val record = current
+            if (record != null && System.currentTimeMillis() >= morningWindowStart(record)) {
+                if (morningCooldownActive()) { detecting = false; return }
+                morningFeelingPending = true
+                if (!showWakeQuestion()) {
+                    detecting = false
+                    if (!Settings.canDrawOverlays(this)) scope.launch {
+                        runCatching { finishNight() }.onFailure { app.message.value = it.message; detecting = false }
+                    }
+                }
+            } else scope.launch {
                 try { repo.motion(detail) } catch (e: Exception) { app.message.value = "活动记录失败：${e.message}"; detecting = false }
             }
         }
@@ -286,6 +307,139 @@ class MonitorService : Service(), SensorEventListener {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra("wakePrompt", true))
         }
+    }
+
+    private fun morningWindowStart(record: NightRecord): Long =
+        wakeTimestamp(record.night.date, record.night.targetWake) - 3 * 3_600_000L
+
+    private fun morningCooldownActive(): Boolean =
+        morningSnoozeAt != 0L && SystemClock.elapsedRealtime() - morningSnoozeAt < 10 * 60_000L
+
+    private fun showWakeQuestion(): Boolean {
+        val record = current ?: return false
+        if (ending || record.night.phase != Phase.MONITORING || MainActivity.visible) return false
+        if (morningCooldownActive()) return false
+        val power = getSystemService(PowerManager::class.java)
+        if (!power.isInteractive || getSystemService(KeyguardManager::class.java).isKeyguardLocked) return false
+        if (!Settings.canDrawOverlays(this) || overlay != null) return false
+        val density = resources.displayMetrics.density
+        fun dp(n: Int) = (n * density).toInt()
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(24), dp(24), dp(16))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.rgb(22, 36, 46)); cornerRadius = dp(28).toFloat()
+                setStroke(dp(1), Color.rgb(46, 71, 82))
+            }
+            elevation = dp(16).toFloat()
+        }
+        layout.addView(TextView(this).apply {
+            text = "bb，醒了吗？🥺"; textSize = 22f; setTextColor(Color.rgb(232, 239, 233))
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); setPadding(0, 0, 0, dp(16))
+        })
+        fun action(label: String, primary: Boolean, onClick: () -> Unit) = Button(this).apply {
+            text = label; isAllCaps = false; textSize = 16f
+            setTextColor(if (primary) Color.rgb(13, 23, 31) else Color.rgb(168, 220, 203))
+            backgroundTintList = android.content.res.ColorStateList.valueOf(if (primary) Color.rgb(168, 220, 203) else Color.TRANSPARENT)
+            stateListAnimator = null
+            setOnClickListener { onClick() }
+        }
+        layout.addView(action("我醒了", true) {
+            removeOverlay()
+            if (!showFeelingChoices()) scope.launch {
+                runCatching { finishNight() }.onFailure { app.message.value = it.message }
+            }
+        }, LinearLayout.LayoutParams(-1, dp(56)).apply { topMargin = dp(4) })
+        layout.addView(action("再睡会儿", false) {
+            removeOverlay()
+            morningSnoozeAt = SystemClock.elapsedRealtime()
+            morningFeelingPending = false
+            detecting = false
+        }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(4) })
+        val scroll = ScrollView(this).apply { addView(layout); isFillViewport = true }
+        val wm = getSystemService(WindowManager::class.java)
+        val params = WindowManager.LayoutParams(
+            (resources.displayMetrics.widthPixels - dp(32)).coerceAtLeast(dp(250)), WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_DIM_BEHIND, android.graphics.PixelFormat.TRANSLUCENT
+        ).apply { gravity = Gravity.CENTER; dimAmount = 0.35f }
+        return try {
+            wm.addView(scroll, params)
+            overlay = scroll; overlayId = null; overlayIsMorning = true
+            morningFeelingPending = false
+            true
+        } catch (e: Exception) {
+            app.message.value = "悬浮提示未能显示：${e.message}"
+            false
+        }
+    }
+
+    private fun showFeelingChoices(): Boolean {
+        val record = current ?: return false
+        if (ending || record.night.phase != Phase.MONITORING || MainActivity.visible) return false
+        val power = getSystemService(PowerManager::class.java)
+        if (!power.isInteractive || getSystemService(KeyguardManager::class.java).isKeyguardLocked) return false
+        if (!Settings.canDrawOverlays(this) || overlay != null) return false
+        val density = resources.displayMetrics.density
+        fun dp(n: Int) = (n * density).toInt()
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(24), dp(24), dp(14))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.rgb(22, 36, 46)); cornerRadius = dp(28).toFloat()
+                setStroke(dp(1), Color.rgb(46, 71, 82))
+            }
+            elevation = dp(16).toFloat()
+        }
+        layout.addView(TextView(this).apply {
+            text = "bb，昨晚睡得怎么样？🥺"; textSize = 21f; setTextColor(Color.rgb(232, 239, 233))
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); setPadding(0, 0, 0, dp(14))
+        })
+        fun action(label: String, primary: Boolean, onClick: () -> Unit) = Button(this).apply {
+            text = label; isAllCaps = false; textSize = 16f
+            setTextColor(if (primary) Color.rgb(13, 23, 31) else Color.rgb(168, 220, 203))
+            backgroundTintList = android.content.res.ColorStateList.valueOf(if (primary) Color.rgb(168, 220, 203) else Color.TRANSPARENT)
+            stateListAnimator = null
+            setOnClickListener { onClick() }
+        }
+        FEELINGS.forEach { feeling ->
+            layout.addView(action(feeling.label, true) {
+                scope.launch { finishMorning(feeling.value) }
+            }, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(4) })
+        }
+        val scroll = ScrollView(this).apply { addView(layout); isFillViewport = true }
+        val wm = getSystemService(WindowManager::class.java)
+        val params = WindowManager.LayoutParams(
+            (resources.displayMetrics.widthPixels - dp(32)).coerceAtLeast(dp(250)), WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_DIM_BEHIND, android.graphics.PixelFormat.TRANSLUCENT
+        ).apply { gravity = Gravity.CENTER; dimAmount = 0.35f }
+        return try {
+            wm.addView(scroll, params)
+            overlay = scroll; overlayId = null; overlayIsMorning = true
+            morningFeelingPending = false
+            true
+        } catch (e: Exception) {
+            app.message.value = "悬浮提示未能显示：${e.message}"
+            false
+        }
+    }
+
+    private suspend fun finishMorning(feeling: String) {
+        val id = try { repo.wake() } catch (e: Exception) {
+            app.message.value = e.message ?: "记录失败"
+            detecting = false
+            return
+        } ?: run { removeOverlay(); stopSelf(); return }
+        try { repo.feeling(id, feeling) } catch (e: Exception) { app.message.value = e.message ?: "感受保存失败" }
+        removeOverlay()
+        getSystemService(NotificationManager::class.java).cancel(MORNING_NOTIFICATION)
+        ending = true
+        sensors.unregisterListener(this)
+        detector = null; sensorKey = null
+        if (wakeLock.isHeld) wakeLock.release()
+        Toast.makeText(this, "早安，已经记好啦 ☀️", Toast.LENGTH_SHORT).show()
+        stopSelf()
     }
 
     private fun notification(text: String): Notification {

@@ -23,6 +23,14 @@ object Phase {
     }
 }
 
+data class FeelingOption(val value: String, val label: String)
+val FEELINGS = listOf(
+    FeelingOption("清醒", "满血复活 ⚡"),
+    FeelingOption("一般", "半梦半醒 🫠"),
+    FeelingOption("很困", "困成小狗 🐶"),
+)
+fun feelingText(value: String?): String = FEELINGS.firstOrNull { it.value == value }?.label ?: value ?: "—"
+
 @Entity(tableName = "nights")
 data class Night(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

@@ -80,6 +80,23 @@ class CoreTest {
         assertFalse(partial.configured)
         assertTrue(partial.copy(authCode = "code").configured)
     }
+    @Test fun oversleepCapIsDurationBasedAcrossMidnight() {
+        val zone = ZoneId.of("Asia/Shanghai")
+        fun at(day: Int, hour: Int, minute: Int) =
+            ZonedDateTime.of(2026, 11, day, hour, minute, 0, 0, zone).toInstant().toEpochMilli()
+        fun record(bed: Long, wake: Long) = NightRecord(
+            Night(id = 10, date = "2026-11-19", firstSleepAt = bed, lastSleepAt = bed,
+                targetBed = 1410, targetWake = 450, wakeAt = wake, phase = Phase.AWAKE, maxSleepMinutes = 600),
+            emptyList(), emptyList())
+        val lateBed = at(19, 23, 30)
+        assertFalse(record(lateBed, at(20, 9, 29)).overslept)
+        assertTrue(record(lateBed, at(20, 9, 29)).valid)
+        assertTrue(record(lateBed, at(20, 9, 31)).overslept)
+        assertFalse(record(lateBed, at(20, 9, 31)).valid)
+        val afterMidnightBed = at(20, 0, 30)
+        assertFalse(record(afterMidnightBed, at(20, 10, 29)).overslept)
+        assertTrue(record(afterMidnightBed, at(20, 10, 31)).overslept)
+    }
     @Test fun defaultsAreQuarterPastMidnightAndHalfPastEight() {
         val settings = SleepSettings()
         assertEquals(15, settings.targetBed)
