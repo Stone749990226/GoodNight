@@ -166,6 +166,12 @@
 - 首页原本显示「今天也要开心」的位置改为读取轮播文字；文件缺失、为空或解析失败时回退原文案。已在手机 17:56 验证显示「人须在事上磨，方立得住。」。
 - 0.9.16（versionCode 26）已安装到 vivo X100s Pro；`testDebugUnitTest` 13 项、`lintDebug`、`assembleDebug` 通过。
 
+## 0.9.17 轮播文字增加出处
+
+- `quotes.json` 每项改为 `text` + `source`；首页正文下方用「—— 作者/出处」显示，正文和出处都居中换行。
+- 保留 35 条清晨、37 条晚上；文件缺失/为空仍回退「今天也要开心」。
+- 0.9.17（versionCode 27）已安装到 vivo X100s Pro；`testDebugUnitTest` 13 项、`lintDebug`、`assembleDebug` 通过。
+
 ## 用户实测与验收范围调整
 
 - 用户已在 vivo 上亲自测试拿起/倾斜检测，并明确将此检查视为完成。

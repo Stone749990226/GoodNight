@@ -39,8 +39,12 @@ internal fun TonightScreen(active: NightRecord?, lastAwake: NightRecord?, now: L
             Text(clock(now), fontSize = size.sp, fontWeight = FontWeight.Light, letterSpacing = (-3).sp, color = Cream, lineHeight = (size * 1.18f).sp)
         }
         val phase = active?.night?.phase ?: lastAwake?.night?.phase
-        Text(if (phase == Phase.AWAKE) DailyQuotes.current(context) else Phase.label(phase),
-            fontSize = 14.sp, color = Muted, lineHeight = 21.sp, textAlign = TextAlign.Center)
+        if (phase == Phase.AWAKE) {
+            val quote = DailyQuotes.current(context)
+            Text(quote.text, fontSize = 14.sp, color = Muted, lineHeight = 21.sp, textAlign = TextAlign.Center)
+            if (quote.source.isNotBlank()) Text("—— ${quote.source}", fontSize = 11.sp, color = Muted,
+                lineHeight = 18.sp, textAlign = TextAlign.Center)
+        } else Text(Phase.label(phase), fontSize = 14.sp, color = Muted, lineHeight = 21.sp, textAlign = TextAlign.Center)
     }
     SoftCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
