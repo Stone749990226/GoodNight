@@ -15,22 +15,24 @@ class ShareExporter(private val context: Context, private val partner: String = 
     fun images(records: List<NightRecord>): List<File> {
         val files = mutableListOf<File>(); val prefix = stamp
         val width = 900; val height = 9000; val margin = 64f
-        var bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        var canvas = Canvas(bitmap); var y = 74f
+        val render = 1.25f
+        val outWidth = (width * render).toInt(); val outHeight = (height * render).toInt()
+        fun page() = Bitmap.createBitmap(outWidth, outHeight, Bitmap.Config.ARGB_8888)
+        fun canvasOf(target: Bitmap) = Canvas(target).apply { scale(render, render) }
+        var bitmap = page(); var canvas = canvasOf(bitmap); var y = 74f
         val ink = Color.rgb(13, 23, 31); val cream = Color.rgb(232, 239, 233)
         val mint = Color.rgb(168, 220, 203); val muted = Color.rgb(159, 178, 185)
         canvas.drawColor(ink)
         fun finish() {
             val used = (y + 66).toInt().coerceIn(240, height)
-            val output = Bitmap.createBitmap(bitmap, 0, 0, width, used)
+            val output = Bitmap.createBitmap(bitmap, 0, 0, outWidth, (used * render).toInt().coerceIn(1, outHeight))
             val file = File(directory, "晚安_${prefix}_${files.size + 1}.png")
             file.outputStream().use { output.compress(Bitmap.CompressFormat.PNG, 100, it) }
             if (output !== bitmap) output.recycle()
             bitmap.recycle(); files.add(file)
         }
         fun nextPage() {
-            finish(); bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            canvas = Canvas(bitmap); canvas.drawColor(ink); y = 74f
+            finish(); bitmap = page(); canvas = canvasOf(bitmap); canvas.drawColor(ink); y = 74f
         }
         fun paragraph(text: String, size: Float = 28f, color: Int = cream, bold: Boolean = false) {
             val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -68,7 +70,8 @@ class ShareExporter(private val context: Context, private val partner: String = 
             r.night.photo?.let { path ->
                 val photo = runCatching {
                     ImageDecoder.decodeBitmap(ImageDecoder.createSource(File(path))) { decoder, info, _ ->
-                        val scale = (772f / info.size.width).coerceAtMost(1f)
+                        val targetWidth = 772f * render
+                        val scale = (targetWidth / info.size.width).coerceAtMost(1f)
                         decoder.setTargetSize((info.size.width * scale).toInt().coerceAtLeast(1), (info.size.height * scale).toInt().coerceAtLeast(1))
                         decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                     }
@@ -85,7 +88,6 @@ class ShareExporter(private val context: Context, private val partner: String = 
             }
             y += 20
         }
-        paragraph("记录间隔不等于真实睡眠。", 22f, muted)
         paragraph("晚安，分享给 $partner", 23f, mint)
         finish()
         return files

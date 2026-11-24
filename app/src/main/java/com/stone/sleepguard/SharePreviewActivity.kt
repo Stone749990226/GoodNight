@@ -37,7 +37,7 @@ class SharePreviewActivity : ComponentActivity() {
                     items(paths, key = { it.absolutePath }) { file ->
                         var bitmap by remember(file) { mutableStateOf<android.graphics.Bitmap?>(null) }
                         LaunchedEffect(file) {
-                            bitmap = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = 2 }) }
+                            bitmap = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(file.absolutePath) }
                         }
                         bitmap?.let { image -> AndroidView(factory = { context -> ImageView(context).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_CENTER } }, update = { it.setImageBitmap(image) }, modifier = Modifier.fillMaxWidth()) }
                     }

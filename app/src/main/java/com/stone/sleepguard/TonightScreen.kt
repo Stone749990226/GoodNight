@@ -88,7 +88,7 @@ internal fun TonightScreen(active: NightRecord?, lastAwake: NightRecord?, now: L
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Metric("最终就寝", clock(lastAwake.finalBedAt), Modifier.weight(1f)); Metric("点击醒了", clock(lastAwake.night.wakeAt), Modifier.weight(1f)); Metric("夜间中断", "${lastAwake.disruptions.size} 次", Modifier.weight(1f))
             }
-            Text("记录间隔不等于实际睡眠。", fontSize = 11.sp, color = Muted)
+            Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = { onFeeling(lastAwake.night.id) }) { Text(lastAwake.night.feeling ?: "补充感受") }
                 TextButton(onClick = { onPhoto(lastAwake.night.id) }) { Text(if (lastAwake.night.photo == null) "拍张户外照片" else "重新拍照") }
