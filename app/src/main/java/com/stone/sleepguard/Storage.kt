@@ -33,6 +33,8 @@ interface SleepDao {
     @Query("DELETE FROM interruptions WHERE nightId = :nightId") suspend fun deleteInterruptions(nightId: Long)
     @Query("DELETE FROM events WHERE nightId = :nightId") suspend fun deleteEvents(nightId: Long)
     @Query("DELETE FROM nights WHERE id = :nightId") suspend fun deleteNight(nightId: Long)
+    @Query("DELETE FROM nights WHERE wakeAt IS NOT NULL AND wakeAt - firstSleepAt < :threshold")
+    suspend fun deleteShortNights(threshold: Long): Int
     @Query("DELETE FROM interruptions WHERE id = :id") suspend fun deleteInterruption(id: Long)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun restoreNight(night: Night)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun restoreInterruption(interruption: Interruption)
@@ -101,6 +103,7 @@ fun powerStatus(context: Context): PowerStatus {
 }
 
 class SleepRepository(private val context: Context) {
+    companion object { const val SHORT_NIGHT = -1L }
     private val db = Room.databaseBuilder(context, SleepDatabase::class.java, "sleep.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
     val dao = db.dao()
     private val mutex = Mutex()
@@ -168,11 +171,22 @@ class SleepRepository(private val context: Context) {
     suspend fun wake(now: Long = System.currentTimeMillis()): Long? = mutex.withLock {
         val record = dao.active() ?: return@withLock null
         check(record.pending == null) { "请先填写这次拿起手机的原因" }
+        if (now - record.night.firstSleepAt < 60 * 60_000L) {
+            db.withTransaction {
+                dao.deleteInterruptions(record.night.id)
+                dao.deleteEvents(record.night.id)
+                dao.deleteNight(record.night.id)
+            }
+            return@withLock SHORT_NIGHT
+        }
         db.withTransaction {
             dao.update(record.night.copy(phase = Phase.AWAKE, wakeAt = now, heartbeatAt = now))
             dao.insert(NightEvent(nightId = record.night.id, at = now, type = "WAKE", detail = "本人点击醒了；监控结束"))
         }
         record.night.id
+    }
+    suspend fun removeShortRecords(threshold: Long = 60 * 60_000L) = mutex.withLock {
+        dao.deleteShortNights(threshold)
     }
     suspend fun feeling(id: Long, feeling: String) = mutex.withLock {
         val record = dao.record(id) ?: return@withLock

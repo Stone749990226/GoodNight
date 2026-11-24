@@ -229,13 +229,16 @@ class MonitorService : Service(), SensorEventListener {
         sensors.unregisterListener(this)
         detector = null; sensorKey = null
         if (wakeLock.isHeld) wakeLock.release()
-        repo.wake()
+        val id = repo.wake()
         removeOverlay()
         getSystemService(NotificationManager::class.java).cancel(MORNING_NOTIFICATION)
-        runCatching {
-            startActivity(Intent(this, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra("feeling", true))
+        when {
+            id == SleepRepository.SHORT_NIGHT -> Toast.makeText(this, "不足1小时，本次不记录", Toast.LENGTH_SHORT).show()
+            id != null -> runCatching {
+                startActivity(Intent(this, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    .putExtra("feeling", true))
+            }
         }
         stopSelf()
     }
@@ -431,6 +434,17 @@ class MonitorService : Service(), SensorEventListener {
             detecting = false
             return
         } ?: run { removeOverlay(); stopSelf(); return }
+        if (id == SleepRepository.SHORT_NIGHT) {
+            removeOverlay()
+            getSystemService(NotificationManager::class.java).cancel(MORNING_NOTIFICATION)
+            ending = true
+            sensors.unregisterListener(this)
+            detector = null; sensorKey = null
+            if (wakeLock.isHeld) wakeLock.release()
+            Toast.makeText(this, "不足1小时，本次不记录", Toast.LENGTH_SHORT).show()
+            stopSelf()
+            return
+        }
         try { repo.feeling(id, feeling) } catch (e: Exception) { app.message.value = e.message ?: "感受保存失败" }
         removeOverlay()
         getSystemService(NotificationManager::class.java).cancel(MORNING_NOTIFICATION)

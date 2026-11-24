@@ -101,7 +101,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val wakeNow: () -> Unit = {
-                    runAction { val id = app.repository.wake(); MonitorService.releaseNow(); stopService(Intent(this@MainActivity, MonitorService::class.java)); feelingId = id }
+                    runAction {
+                        val id = app.repository.wake()
+                        MonitorService.releaseNow(); stopService(Intent(this@MainActivity, MonitorService::class.java))
+                        if (id == SleepRepository.SHORT_NIGHT) app.message.value = "不足1小时，本次不记录" else feelingId = id
+                    }
                 }
                 val active = records.firstOrNull { it.night.phase != Phase.AWAKE }
                 val lastAwake = records.firstOrNull { it.night.phase == Phase.AWAKE }

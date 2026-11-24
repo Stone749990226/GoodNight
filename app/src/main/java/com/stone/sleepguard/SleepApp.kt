@@ -18,6 +18,9 @@ class SleepApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        scope.launch { preferences.migrateDefaults() }
+        scope.launch {
+            preferences.migrateDefaults()
+            repository.removeShortRecords()
+        }
     }
 }
