@@ -173,6 +173,8 @@
 - 0.9.17（versionCode 27）已安装到 vivo X100s Pro；`testDebugUnitTest` 13 项、`lintDebug`、`assembleDebug` 通过。
 - 0.9.18：用户自行扩充到 76 条 morning / 92 条 evening，含多条例句；页面不设 maxLines/省略号，整页可滚动，长句和出处完整换行显示。
 - 0.9.19：轮播日改为 05:00 换日；00:00–04:59 沿用前一晚的晚间句，避免午夜跳到下一天。取句索引仍是 `dayOfYear + (evening ? 7 : 0)` 对池大小取模。
+- 0.9.20：中断填完原因后 10 分钟未重新晚安，服务自动恢复为 SETTLING 并重新布防；自动恢复不发「再次晚安」邮件。手动 10 分钟内点晚安仍发送。
+- 0.9.20（versionCode 30）已安装到 vivo X100s Pro；`testDebugUnitTest` 13 项、`lintDebug`、`assembleDebug` 通过。
 
 ## 用户实测与验收范围调整
 

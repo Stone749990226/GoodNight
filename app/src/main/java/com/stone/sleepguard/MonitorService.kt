@@ -107,6 +107,10 @@ class MonitorService : Service(), SensorEventListener {
                 delay(1000)
                 val record = current
                 if (record?.night?.phase == Phase.SETTLING && System.currentTimeMillis() >= (record.night.armedAt ?: Long.MAX_VALUE)) repo.arm()
+                if (record?.night?.phase == Phase.TEMP) {
+                    val interruption = record.disruptions.lastOrNull { it.returnedAt == null }
+                    if (interruption != null && System.currentTimeMillis() - interruption.detectedAt >= 10 * 60_000L) repo.autoResume()
+                }
                 if (record != null && SystemClock.elapsedRealtime() - lastBeat > 60_000) {
                     lastBeat = SystemClock.elapsedRealtime()
                     if (!ending && detector != null && record.night.phase in listOf(Phase.SETTLING, Phase.MONITORING)) wakeLock.acquire(600_000L)

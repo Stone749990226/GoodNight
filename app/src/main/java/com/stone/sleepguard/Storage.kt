@@ -226,6 +226,17 @@ class SleepRepository(private val context: Context) {
         }
     }
 
+    /** 填完原因 10 分钟仍未重新点晚安：自动继续监控，不发送再次晚安邮件。 */
+    suspend fun autoResume(now: Long = System.currentTimeMillis()) = mutex.withLock {
+        val record = dao.active() ?: return@withLock
+        if (record.night.phase != Phase.TEMP) return@withLock
+        db.withTransaction {
+            record.interruptions.filter { !it.morning && it.returnedAt == null }.forEach { dao.update(it.copy(returnedAt = now)) }
+            dao.update(record.night.copy(lastSleepAt = now, phase = Phase.SETTLING, armedAt = now + 15_000, heartbeatAt = now))
+            dao.insert(NightEvent(nightId = record.night.id, at = now, type = "RESUME", detail = "10分钟未重新晚安，自动继续监控"))
+        }
+    }
+
     /** 删除已结束的一晚，返回删除前的快照供撤销。照片文件保留，撤销后仍可用。 */
     suspend fun deleteNight(id: Long): NightRecord? = mutex.withLock {
         val record = dao.record(id) ?: return@withLock null
