@@ -17,8 +17,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.*
 import java.time.LocalDate
@@ -81,13 +84,16 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
                 onSwipeHabit(habit.id)
             }
         }) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (task != null) Checkbox(done, {
                     if (!done) onCompleted("已完成：${task.title}！bb真厉害！💗") { onToggleTask(task.id) }
                     onToggleTask(task.id)
                 })
-                else Box(Modifier.size(38.dp).background(Mint.copy(alpha = .11f), CircleShape), contentAlignment = Alignment.Center) { Text(habit!!.glyph(), fontSize = 21.sp) }
-                Column(Modifier.weight(1f).clickable { if (task != null) onEditTask(task) else onHabit(habit!!) }.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                else Box(Modifier.size(34.dp).background(if (done) Mint else Mint.copy(alpha = .11f), CircleShape), contentAlignment = Alignment.Center) {
+                    Text(if (done) "✓" else habit!!.glyph(), color = if (done) Ink else Cream, fontSize = if (done) 20.sp else 19.sp,
+                        fontWeight = if (done) FontWeight.Bold else FontWeight.Normal)
+                }
+                Column(Modifier.weight(1f).clickable { if (task != null) onEditTask(task) else onHabit(habit!!) }.padding(horizontal = 10.dp, vertical = 5.dp)) {
                     Text(task?.title ?: habit!!.title, color = if (done) Muted else Cream, fontSize = 16.sp)
                     val meta = listOf(marker, schedule).filter { it.isNotEmpty() }.joinToString("  ")
                     if (meta.isNotEmpty()) Text(meta, color = Muted, fontSize = 12.sp)
@@ -204,6 +210,8 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
 
 @Composable private fun SwipeRight(onSwipe: () -> Unit, content: @Composable () -> Unit) {
     var dx by remember { mutableFloatStateOf(0f) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val reveal = Color(0xFF24C79A)
     Box(Modifier.fillMaxWidth().pointerInput(Unit) {
         detectHorizontalDragGestures(
             onDragStart = { dx = 0f },
@@ -217,9 +225,17 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
                 if (dx > 60.dp.toPx()) onSwipe()
                 dx = 0f
             })
-    }.clip(RoundedCornerShape(12.dp)).background(Mint)) {
+    }.clip(RoundedCornerShape(12.dp)).background(reveal)) {
         Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel)
             .offset { androidx.compose.ui.unit.IntOffset(dx.roundToInt(), 0) }) { content() }
+        if (dx > 0f) {
+            Box(Modifier.align(Alignment.CenterStart)
+                .width(with(density) { dx.toDp() })
+                .fillMaxHeight()
+                .background(reveal), contentAlignment = Alignment.Center) {
+                if (dx > with(density) { 24.dp.toPx() }) Text("✓", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 
