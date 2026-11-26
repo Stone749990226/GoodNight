@@ -50,7 +50,7 @@ internal fun PlanScreen(
     onDeleteHabit: (Long) -> Unit,
     onHabitStep: (Long, LocalDate, Int?, Boolean) -> Unit,
     onHabitSwipe: (Long, LocalDate) -> Unit,
-    onCompleted: (String, () -> Unit) -> Unit,
+    onCompleted: (String, (() -> Unit)?) -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("plan_view", 0) }

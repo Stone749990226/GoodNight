@@ -50,7 +50,7 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
 @Composable internal fun DayAgenda(tasks: List<PlanTask>, habits: List<Habit>, reminders: List<HabitReminder>,
     days: List<HabitDay>, timeline: Boolean, canCheck: Boolean, checks: List<HabitCheckIn>, onEditTask: (PlanTask) -> Unit,
     onToggleTask: (Long) -> Unit, onHabit: (Habit) -> Unit, onStep: (Long, Int?, Boolean) -> Unit,
-    onSwipeTask: (Long) -> Unit, onSwipeHabit: (Long) -> Unit, onCompleted: (String, () -> Unit) -> Unit, onStats: () -> Unit) {
+    onSwipeTask: (Long) -> Unit, onSwipeHabit: (Long) -> Unit, onCompleted: (String, (() -> Unit)?) -> Unit, onStats: () -> Unit) {
     val times = reminders.groupBy { it.habitId }
     val records = days.associateBy { it.habitId }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -71,7 +71,8 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
         val marker = if (!alarm) "" else if (task?.alarm == true || habit?.reminderMode == "ALARM") "⏰" else "🔔"
         val schedule = if (task != null) task.dueMinute?.let { minutesText(it) + (task.endMinute?.let { end -> "–${minutesText(end)}" } ?: "") } ?: "全天"
             else if (timeline) "" else times[habit?.id].orEmpty().joinToString(" · ") { minutesText(it.minute) }
-        SwipeRight(onSwipe = {
+        SwipeRight(revealColor = if (done) Color(0xFFE05B5B) else Color(0xFF24C79A),
+            symbol = if (done) "↺" else "✓", onSwipe = {
             if (task != null) {
                 if (!done) onCompleted("已完成：${task.title}！bb真厉害！💗") { onToggleTask(task.id) }
                 onSwipeTask(task.id)
@@ -80,7 +81,7 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
                     val text = if (count + 1 >= target) "已完成：${habit.title}！bb真厉害！💗"
                     else "${habit.title} +1，bb真厉害！💗"
                     onCompleted(text) { onStep(habit.id, null, true) }
-                }
+                } else onCompleted("次数重置：${habit.title}") { null }
                 onSwipeHabit(habit.id)
             }
         }) {
@@ -95,9 +96,15 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
                 }
                 Column(Modifier.weight(1f).clickable { if (task != null) onEditTask(task) else onHabit(habit!!) }.padding(horizontal = 10.dp, vertical = 5.dp)) {
                     Text(task?.title ?: habit!!.title, color = if (done) Muted else Cream, fontSize = 16.sp)
-                    val meta = listOf(marker, schedule).filter { it.isNotEmpty() }.joinToString("  ")
-                    if (meta.isNotEmpty()) Text(meta, color = Muted, fontSize = 12.sp)
+                    if (task?.note?.isNotBlank() == true) Text(task.note, color = Muted, fontSize = 12.sp, maxLines = 2)
+                    if (habit != null) {
+                        val meta = listOf(marker, schedule).filter { it.isNotEmpty() }.joinToString("  ")
+                        if (meta.isNotEmpty()) Text(meta, color = Muted, fontSize = 12.sp)
+                    }
                 }
+                if (task != null) Text(
+                    listOf(marker, schedule).filter { it.isNotEmpty() }.joinToString(" "),
+                    color = Muted, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
                 if (habit != null) TextButton(enabled = canCheck && (!done || (entry.minute == null && target == 1)), onClick = {
                     if (!done) {
                         val text = if (target == 1 || count + 1 >= target) "已完成：${habit.title}！bb真厉害！💗"
@@ -126,15 +133,14 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
             }
         }
     } else {
-        var completed by rememberSaveable { mutableStateOf(false) }
         SoftCard {
             Text("计划", color = Cream, fontSize = 17.sp)
             val pending = tasks.filter { it.completedAt == null }.sortedBy { it.dueMinute ?: -1 }
             if (tasks.isEmpty()) Text("暂无计划", color = Muted, fontSize = 13.sp)
             pending.forEach { item(AgendaItem(it.dueMinute, task = it)) }
             val finished = tasks.filter { it.completedAt != null }
-            if (finished.isNotEmpty()) TextButton(onClick = { completed = !completed }) { Text("已完成 ${finished.size}  ${if (completed) "收起" else "展开"}") }
-            if (completed) finished.forEach { item(AgendaItem(it.dueMinute, task = it)) }
+            if (finished.isNotEmpty()) Text("已完成", color = Muted, fontSize = 12.sp)
+            finished.forEach { item(AgendaItem(it.dueMinute, task = it)) }
         }
         SoftCard {
             Text("习惯", color = Cream, fontSize = 17.sp)
@@ -148,6 +154,7 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
 @Composable internal fun TaskSheet(task: PlanTask?, selected: LocalDate, onDismiss: () -> Unit, onHabit: () -> Unit,
     onDelete: (Long) -> Unit, onSave: (PlanTask) -> Unit) {
     var title by rememberSaveable { mutableStateOf(task?.title.orEmpty()) }
+    var note by rememberSaveable { mutableStateOf(task?.note.orEmpty()) }
     var epoch by rememberSaveable { mutableLongStateOf(task?.dueDate?.toLong() ?: selected.toEpochDay()) }
     val date = LocalDate.ofEpochDay(epoch)
     var start by rememberSaveable { mutableStateOf(task?.dueMinute) }
@@ -159,7 +166,7 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
     val context = LocalContext.current
     val focus = remember { FocusRequester() }
     val valid = title.isNotBlank() && (end == null || (start != null && end!! > start!!))
-    fun save() { if (valid) onSave((task ?: PlanTask(title = "", dueDate = epoch.toInt())).copy(title = title.trim(), dueDate = epoch.toInt(),
+    fun save() { if (valid) onSave((task ?: PlanTask(title = "", dueDate = epoch.toInt())).copy(title = title.trim(), note = note.trim(), dueDate = epoch.toInt(),
         dueMinute = start, endMinute = end, alarm = mode == "闹钟", reminderMinute = if (mode == "无") null else start?.minus(advance))) }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -169,6 +176,7 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
             }
             OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth().focusRequester(focus), singleLine = true, placeholder = { Text("要做什么？") },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { save() }))
+            OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth(), placeholder = { Text("描述（可选）") }, minLines = 2, maxLines = 4)
             val suggestion = remember(title, selected) { quickPlan(title, LocalDate.now(), selected) }
             if (suggestion != null) AssistChip(onClick = {
                 title = suggestion.title; epoch = suggestion.date.toEpochDay(); start = suggestion.start; end = suggestion.end
@@ -208,10 +216,10 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
     if (deleting && task != null) AlertDialog(onDismissRequest = { deleting = false }, title = { Text("删除这项计划？") }, confirmButton = { TextButton(onClick = { onDelete(task.id) }) { Text("删除") } }, dismissButton = { TextButton(onClick = { deleting = false }) { Text("保留") } })
 }
 
-@Composable private fun SwipeRight(onSwipe: () -> Unit, content: @Composable () -> Unit) {
+@Composable private fun SwipeRight(revealColor: Color, symbol: String, onSwipe: () -> Unit, content: @Composable () -> Unit) {
     var dx by remember { mutableFloatStateOf(0f) }
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val reveal = Color(0xFF24C79A)
+    val reveal = revealColor
     Box(Modifier.fillMaxWidth().pointerInput(Unit) {
         detectHorizontalDragGestures(
             onDragStart = { dx = 0f },
@@ -233,7 +241,7 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
                 .width(with(density) { dx.toDp() })
                 .fillMaxHeight()
                 .background(reveal), contentAlignment = Alignment.Center) {
-                if (dx > with(density) { 24.dp.toPx() }) Text("✓", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                if (dx > with(density) { 24.dp.toPx() }) Text(symbol, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

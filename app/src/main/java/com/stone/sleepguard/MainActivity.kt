@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
                 val tick by permissionTick.collectAsStateWithLifecycle()
                 val message by app.message.collectAsStateWithLifecycle()
                 val snackbar = remember { SnackbarHostState() }
-                var completionNotice by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) }
+                var completionNotice by remember { mutableStateOf<Pair<String, (() -> Unit)?>?>(null) }
                 var tab by rememberSaveable { mutableIntStateOf(0) }
                 var quickAdd by rememberSaveable { mutableStateOf(false) }
                 var planDate by rememberSaveable { mutableLongStateOf(LocalDate.now().toEpochDay()) }
@@ -86,8 +86,12 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); if (app.message.value == it) app.message.value = null } }
                 LaunchedEffect(completionNotice) {
                     val notice = completionNotice ?: return@LaunchedEffect
-                    val result = snackbar.showSnackbar(notice.first, actionLabel = "撤销", duration = SnackbarDuration.Short)
-                    if (result == SnackbarResult.ActionPerformed) notice.second()
+                    val undo = notice.second
+                    val result = if (undo == null) {
+                        snackbar.showSnackbar(notice.first, duration = SnackbarDuration.Short)
+                        null
+                    } else snackbar.showSnackbar(notice.first, actionLabel = "撤销", duration = SnackbarDuration.Short)
+                    if (result == SnackbarResult.ActionPerformed) undo?.invoke()
                     completionNotice = null
                 }
                 LaunchedEffect(deleted) {
