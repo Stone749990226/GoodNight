@@ -134,7 +134,15 @@ class MainActivity : ComponentActivity() {
                 val planHabits by planRepo.habits().collectAsStateWithLifecycle(emptyList())
                 val planReminders by planRepo.reminders().collectAsStateWithLifecycle(emptyList())
                 val planCheckIns by remember(selectedPlanDate) { planRepo.days(selectedPlanDate) }.collectAsStateWithLifecycle(emptyList())
+                val todayTasks by remember(today) { planRepo.tasks(today) }.collectAsStateWithLifecycle(emptyList())
+                val todayDays by remember(today) { planRepo.days(today) }.collectAsStateWithLifecycle(emptyList())
                 val planMarks by remember(today) { planRepo.marks(today.minusDays(180), today.plusDays(180)) }.collectAsStateWithLifecycle(emptyMap())
+                val todayHabits = planHabits.filter { it.isDue(today) }
+                val planDone = todayTasks.count { it.completedAt != null }
+                val habitDone = todayHabits.count { habit ->
+                    val day = todayDays.firstOrNull { it.habitId == habit.id }
+                    (day?.count ?: 0) >= (day?.dayTarget ?: habit.targetCount).coerceAtLeast(1)
+                }
                 Scaffold(containerColor = Ink, contentColor = Cream, snackbarHost = {
                     SnackbarHost(snackbar) { data ->
                         Snackbar(snackbarData = data, containerColor = Panel, contentColor = Cream,
@@ -159,7 +167,8 @@ class MainActivity : ComponentActivity() {
                             Column(Modifier.fillMaxSize().verticalScroll(pageScroll).padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             when (tab) {
                                 0 -> TonightScreen(active, lastAwake, now, power, preferences, working,
-                                    partner = partner,
+                                    partner = partner, planDone = planDone, planTotal = todayTasks.size,
+                                    habitDone = habitDone, habitTotal = todayHabits.size,
                                     onSleep = {
                                         if (active == null) wakeDialog = true
                                         else runAction { MonitorService.start(this@MainActivity, if (active.night.phase == Phase.RECOVERY) MonitorService.RESUME else MonitorService.SLEEP) }

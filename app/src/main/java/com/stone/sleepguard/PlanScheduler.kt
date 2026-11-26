@@ -66,10 +66,10 @@ object PlanScheduler {
     }
 
     fun syncTask(context: Context, task: PlanTask) {
-        cancelTask(context, task.id)
-        val trigger = taskTrigger(task) ?: return
-        if (task.completedAt == null && trigger > System.currentTimeMillis())
+        val trigger = taskTrigger(task)
+        if (task.completedAt == null && trigger != null && trigger > System.currentTimeMillis()) {
             setAlarm(context, trigger, taskIntent(context, task.id), req("task", task.id), task.alarm)
+        } else cancelTask(context, task.id)
     }
 
     fun postTask(context: Context, task: PlanTask) {
@@ -77,7 +77,8 @@ object PlanScheduler {
         val channel = if (task.alarm) ALARM_CHANNEL else CHANNEL_NOTIFY
         val open = PendingIntent.getActivity(context, req("task", task.id),
             Intent(context, MainActivity::class.java).putExtra("plan", true).putExtra("planDate", task.dueDate.toLong()), flags())
-        val notification = NotificationCompat.Builder(context, channel).setSmallIcon(R.drawable.ic_moon)
+        val playing = task.alarm && PlanRingService.start(context, task.title)
+        val notification = NotificationCompat.Builder(context, channel).setSilent(playing).setSmallIcon(R.drawable.ic_moon)
             .setContentTitle(task.title).setContentText(task.dueMinute?.let { "计划时间 ${minutesText(it)}" } ?: "计划提醒")
             .setCategory(if (task.alarm) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(open).setAutoCancel(true).build()
@@ -148,7 +149,8 @@ object PlanScheduler {
         val action = if (count + 1 >= target) "完成" else "+1"
         val open = PendingIntent.getActivity(context, req("open", habit.id, minute),
             Intent(context, MainActivity::class.java).putExtra("plan", true), flags())
-        return NotificationCompat.Builder(context, channel)
+        val playing = habit.reminderMode == "ALARM" && PlanRingService.start(context, habit.title)
+        return NotificationCompat.Builder(context, channel).setSilent(playing)
             .setSmallIcon(R.drawable.ic_moon)
             .setContentTitle("${partner}提醒你该去${habit.title}了哦 ${habit.glyph()}")
             .setContentText("${minutesText(minute)} · 今天 $count/$target")
@@ -171,13 +173,15 @@ class PlanAlarmReceiver : BroadcastReceiver() {
         app.scope.launch(Dispatchers.IO) {
             try {
                 val action = intent.action
-                if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_TIMEZONE_CHANGED || action == Intent.ACTION_DATE_CHANGED) {
+                if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_TIMEZONE_CHANGED || action == Intent.ACTION_DATE_CHANGED ||
+                    action == Intent.ACTION_TIME_CHANGED || action == Intent.ACTION_MY_PACKAGE_REPLACED ||
+                    action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) {
                     PlanScheduler.rebuild(context); return@launch
                 }
                 if (action == PlanScheduler.ACTION_MIDNIGHT) {
                     val date = intent.getIntExtra(PlanScheduler.EXTRA_DATE, 0).let { LocalDate.ofEpochDay(it.toLong()) }
-                    app.planRepository.midnightSummary(date)
                     PlanScheduler.rebuild(context)
+                    app.planRepository.midnightSummary(date)
                     return@launch
                 }
                 if (action == PlanScheduler.ACTION_TASK) {
@@ -212,7 +216,8 @@ class PlanAlarmReceiver : BroadcastReceiver() {
                                 PlanScheduler.notification(context, habit, date, minute, count, partner))
                     }
                 }
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
+                android.util.Log.e("GoodNightRing", "Reminder delivery failed: ${intent.action}", failure)
             } finally { pending.finish() }
         }
     }

@@ -236,7 +236,13 @@ class PlanRepository(private val context: Context) {
         result
     }
 
+    private fun requireAlarmAccess() {
+        val manager = context.getSystemService(android.app.AlarmManager::class.java)
+        require(android.os.Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()) { "请先允许准点闹钟，再保存提醒" }
+    }
+
     suspend fun saveTask(task: PlanTask) = mutex.withLock {
+        if (task.alarm && task.reminderMinute != null) requireAlarmAccess()
         require(task.title.isNotBlank())
         require(task.dueMinute == null || task.dueMinute in 0..1439)
         require(task.endMinute == null || (task.dueMinute != null && task.endMinute in task.dueMinute + 1..1439))
@@ -257,6 +263,7 @@ class PlanRepository(private val context: Context) {
     suspend fun deleteTask(id: Long) = mutex.withLock { dao.deleteTask(id); PlanScheduler.cancelTask(context, id) }
 
     suspend fun saveHabit(habit: Habit, reminderMinutes: List<Int>): Long = mutex.withLock {
+        if (habit.reminderMode == "ALARM" && reminderMinutes.isNotEmpty()) requireAlarmAccess()
         val clean = habit.title.trim()
         require(clean.isNotEmpty()) { "请写下习惯名称" }
 

@@ -18,7 +18,6 @@
     <style name="GoodNightClockFace" parent="@android:style/Widget.Material.TimePicker">
         <item name="android:timePickerMode">clock</item>
         <item name="android:headerBackground">@android:color/transparent</item>
-        <item name="android:headerTextColor">@color/clock_header</item>
         <item name="android:numbersBackgroundColor">#292D37</item>
         <item name="android:numbersSelectorColor">#4778EF</item>
     </style>
