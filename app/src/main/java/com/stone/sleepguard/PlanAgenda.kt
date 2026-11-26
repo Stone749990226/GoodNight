@@ -19,9 +19,16 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.*
 import java.time.LocalDate
 
-internal val habitIcons = listOf("💧", "🌱", "📖", "🌙", "👁️", "🏃", "🥛", "🎵")
+internal val habitIcons = listOf(
+    "💧", "💊", "👁️", "📖", "🏃", "🥛", "🌙", "🍎",
+    "🥗", "🍽️", "☕", "🧘", "🚶", "🏋️", "🧹", "🧺",
+    "🛏️", "🧴", "🪥", "💻", "📝", "🎵", "🎨", "🧠",
+    "🙏", "💤", "🚭", "🍬", "🐶", "🌱", "☀️", "❤️",
+    "💪", "🚴", "🏊", "🧘‍♀️", "🍵", "🥤", "🍳", "📚",
+)
 internal fun Habit.glyph() = icon.ifBlank { when {
     "水" in title -> "💧"
+    "药" in title -> "💊"
     "眼" in title -> "👁️"
     "读" in title || "书" in title -> "📖"
     "奶" in title || "蛋白" in title -> "🥛"

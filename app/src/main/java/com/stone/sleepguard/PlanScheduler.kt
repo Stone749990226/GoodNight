@@ -5,6 +5,7 @@ import android.content.*
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -140,20 +141,22 @@ object PlanScheduler {
             Intent(context, PlanAlarmReceiver::class.java).setAction(ACTION_COMPLETE)
                 .putExtra(EXTRA_HABIT, habitId).putExtra(EXTRA_DATE, date.toEpochDay()).putExtra(EXTRA_MINUTE, minute), flags())
 
-    fun notification(context: Context, habit: Habit, date: LocalDate, minute: Int): Notification {
+    fun notification(context: Context, habit: Habit, date: LocalDate, minute: Int, count: Int, partner: String): Notification {
         ensureChannel(context)
         val channel = if (habit.reminderMode == "ALARM") ALARM_CHANNEL else CHANNEL_NOTIFY
+        val target = habit.targetCount.coerceAtLeast(1)
+        val action = if (count + 1 >= target) "完成" else "+1"
         val open = PendingIntent.getActivity(context, req("open", habit.id, minute),
             Intent(context, MainActivity::class.java).putExtra("plan", true), flags())
         return NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_moon)
-            .setContentTitle("⏰ ${habit.title}")
-            .setContentText("${minutesText(minute)} · 点完成打卡")
+            .setContentTitle("${partner}提醒你该去${habit.title}了哦 ${habit.glyph()}")
+            .setContentText("${minutesText(minute)} · 今天 $count/$target")
             .setPriority(if (habit.reminderMode == "ALARM") NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(if (habit.reminderMode == "ALARM") NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(open)
-            .addAction(0, "完成", completeIntent(context, habit.id, date, minute))
+            .addAction(0, action, completeIntent(context, habit.id, date, minute))
             .build()
     }
 
@@ -199,11 +202,14 @@ class PlanAlarmReceiver : BroadcastReceiver() {
                 } else if (action == PlanScheduler.ACTION_HABIT) {
                     if (!habit.isDue(date)) return@launch
                     if (app.planRepository.dao.reminders(habitId).none { it.minute == minute }) return@launch
-                    val done = app.planRepository.dao.day(habitId, date.toEpochDay().toInt())?.completedAt != null
-                    if (!done && app.planRepository.dao.checkIn(habitId, date.toEpochDay().toInt(), minute)?.completedAt == null) {
+                    val count = app.planRepository.dao.day(habitId, date.toEpochDay().toInt())?.count ?: 0
+                    val target = habit.targetCount.coerceAtLeast(1)
+                    if (count < target) {
+                        val partner = partnerName(app.rolePreferences.flow.first().role)
                         PlanScheduler.ensureChannel(context)
                         context.getSystemService(NotificationManager::class.java)
-                            .notify((habitId.toString() + date + minute).hashCode(), PlanScheduler.notification(context, habit, date, minute))
+                            .notify((habitId.toString() + date + minute).hashCode(),
+                                PlanScheduler.notification(context, habit, date, minute, count, partner))
                     }
                 }
             } catch (_: Exception) {

@@ -234,6 +234,13 @@ class PlanRepository(private val context: Context) {
         val id = if (habit.id == 0L) dao.insertHabit(habit.copy(title = clean))
         else { dao.updateHabit(habit.copy(title = clean)); dao.deleteReminders(habit.id); habit.id }
         times.forEach { dao.insertReminder(HabitReminder(habitId = id, minute = it)) }
+        // 修改目标次数时同步当天；历史日期保留各自的目标快照。
+        val today = LocalDate.now().toEpochDay().toInt()
+        dao.day(id, today)?.let { current ->
+            val target = habit.targetCount.coerceAtLeast(1)
+            dao.updateDay(current.copy(dayTarget = target,
+                completedAt = if (current.count >= target) (current.completedAt ?: System.currentTimeMillis()) else null))
+        }
         id
     }
 

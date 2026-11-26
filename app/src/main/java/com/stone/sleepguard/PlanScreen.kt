@@ -240,6 +240,7 @@ internal fun PlanScreen(
     var times by remember(existing?.id) { mutableStateOf(initialTimes.distinct().sorted()) }
     var confirmDelete by remember { mutableStateOf(false) }
     var pickingTime by remember { mutableStateOf(false) }
+    var iconsExpanded by remember { mutableStateOf(false) }
     if (pickingTime) WheelTimeDialog(initial = java.time.LocalTime.now().hour * 60, title = "提醒时间", confirmLabel = "添加",
         onDismiss = { pickingTime = false }, onConfirm = { minute ->
             if (times.size < 5 && minute !in times) times = (times + minute).sorted()
@@ -251,8 +252,21 @@ internal fun PlanScreen(
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Panel, unfocusedContainerColor = Panel,
                     focusedTextColor = Cream, unfocusedTextColor = Cream, focusedBorderColor = Mint, unfocusedBorderColor = Color(0xFF3B505C), cursorColor = Mint))
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                habitIcons.forEach { glyph -> FilterChip(selected = icon == glyph, onClick = { icon = glyph }, label = { Text(glyph) }) }
+            val preview = (listOf(icon).filter { it.isNotBlank() } + habitIcons).distinct().take(6)
+            if (iconsExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    habitIcons.chunked(7).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            row.forEach { glyph -> IconChoice(glyph, icon == glyph) { icon = glyph } }
+                        }
+                    }
+                    TextButton(onClick = { iconsExpanded = false }) { Text("收起") }
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    preview.forEach { glyph -> IconChoice(glyph, icon == glyph) { icon = glyph } }
+                    TextButton(onClick = { iconsExpanded = true }) { Text("⌄") }
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(FREQ_DAILY to "每天", FREQ_WEEKDAYS to "每周", FREQ_WORKDAYS to "工作日").forEach { (value, label) ->
@@ -303,6 +317,14 @@ internal fun PlanScreen(
         title = { Text("删除这个习惯和打卡记录？") }, confirmButton = { TextButton(onClick = onDelete) { Text("删除") } },
         dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("保留") } })
 
+}
+
+@Composable private fun IconChoice(glyph: String, selected: Boolean, onClick: () -> Unit) {
+    Box(Modifier.size(36.dp).clip(RoundedCornerShape(50))
+        .background(if (selected) Mint.copy(alpha = .28f) else Color.Transparent)
+        .clickable { onClick() }, contentAlignment = Alignment.Center) {
+        Text(glyph, fontSize = 21.sp)
+    }
 }
 
 private fun frequencyText(habit: Habit): String = when (habit.frequency) {
