@@ -11,14 +11,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
+import android.graphics.Paint
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import kotlin.math.ceil
+import kotlin.math.max
 
 fun recordsForDays(records: List<NightRecord>, days: Int): List<NightRecord> {
     if (days == 1) return records.take(1)
@@ -121,18 +125,49 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
             Text(label, color = color, fontSize = 11.sp)
             Text("${minutesText(low.mod(1440))} — ${minutesText(high.mod(1440))}", color = Muted, fontSize = 10.sp)
         }
-        Canvas(Modifier.fillMaxWidth().height(64.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(104.dp)) {
             val w = size.width; val h = size.height
-            for (i in 0..2) drawLine(Color(0xFF2C414B), Offset(0f, h * i / 2), Offset(w, h * i / 2), 1.dp.toPx())
-            val points = values.mapIndexed { i, value -> Offset(if (values.size == 1) w / 2 else 8f + i * (w - 16f) / (values.size - 1), h - 6f - (value - low).toFloat() / (high - low) * (h - 12f)) }
-            val path = Path(); points.forEachIndexed { i, p -> if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y) }
-            drawPath(path, color, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
-            points.forEach { drawCircle(color, 3.dp.toPx(), it) }
+            val left = 40.dp.toPx(); val top = 6.dp.toPx(); val bottom = 20.dp.toPx()
+            val chartW = (w - left).coerceAtLeast(1f)
+            val chartH = (h - top - bottom).coerceAtLeast(1f)
+            val yPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = Muted.toArgb(); this.textSize = 9.sp.toPx(); this.textAlign = Paint.Align.RIGHT
+            }
+            val xPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = Muted.toArgb(); this.textSize = 9.sp.toPx(); this.textAlign = Paint.Align.CENTER
+            }
+            for (i in 0..2) {
+                val y = top + chartH * i / 2f
+                drawLine(Color(0xFF2C414B), Offset(left, y), Offset(w, y), 1.dp.toPx())
+                val value = high - (high - low) * i / 2f
+                drawContext.canvas.nativeCanvas.drawText(minutesText(value.toInt().mod(1440)), left - 6.dp.toPx(), y + 3.sp.toPx(), yPaint)
+            }
+            if (values.isNotEmpty()) {
+                val points = values.mapIndexed { i, value ->
+                    Offset(
+                        if (values.size == 1) left + chartW / 2 else left + i * chartW / (values.size - 1),
+                        top + chartH - (value - low).toFloat() / (high - low).coerceAtLeast(1) * chartH,
+                    )
+                }
+                val path = Path(); points.forEachIndexed { i, p -> if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y) }
+                drawPath(path, color, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
+                points.forEach { drawCircle(color, 3.dp.toPx(), it) }
+
+                val labelWidth = 52.dp.toPx()
+                val step = max(1, ceil(values.size / (chartW / labelWidth).coerceAtLeast(1f)).toInt())
+                var lastLabelX = -Float.MAX_VALUE
+                points.forEachIndexed { i, p ->
+                    if (i % step != 0) return@forEachIndexed
+                    val x = p.x.coerceIn(labelWidth / 2, w - labelWidth / 2)
+                    drawContext.canvas.nativeCanvas.drawText(sorted[i].night.date.drop(5), x, h - 4.dp.toPx(), xPaint)
+                    lastLabelX = x
+                }
+                val lastX = points.last().x.coerceIn(labelWidth / 2, w - labelWidth / 2)
+                if (lastX - lastLabelX > labelWidth * .7f) {
+                    drawContext.canvas.nativeCanvas.drawText(sorted.last().night.date.drop(5), lastX, h - 4.dp.toPx(), xPaint)
+                }
+            }
         }
-    }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(sorted.firstOrNull()?.night?.date?.drop(5) ?: "尚无有效数据", color = Muted, fontSize = 10.sp)
-        Text(sorted.lastOrNull()?.night?.date?.drop(5) ?: "", color = Muted, fontSize = 10.sp)
     }
 }
 @Composable private fun SummaryTable(records: List<NightRecord>, onSelect: (Long) -> Unit) {
