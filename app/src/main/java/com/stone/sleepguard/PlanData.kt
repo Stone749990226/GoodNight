@@ -35,6 +35,19 @@ data class Habit(
     val startDate: Int = LocalDate.now().toEpochDay().toInt(),
     val active: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
+    val targetCount: Int = 1,
+    val reminderMode: String = "ALARM",
+)
+
+@Entity(tableName = "habit_days", primaryKeys = ["habitId", "date"], foreignKeys = [ForeignKey(
+    entity = Habit::class, parentColumns = ["id"], childColumns = ["habitId"], onDelete = ForeignKey.CASCADE
+)], indices = [Index("date")])
+data class HabitDay(
+    val habitId: Long,
+    val date: Int,
+    val count: Int = 0,
+    val completedAt: Long? = null,
+    val overdueEmailSent: Boolean = false,
 )
 
 @Entity(tableName = "habit_reminders", foreignKeys = [ForeignKey(
@@ -88,6 +101,12 @@ interface PlanDao {
     @Insert suspend fun insertReminder(reminder: HabitReminder): Long
     @Query("DELETE FROM habit_reminders WHERE habitId = :habitId") suspend fun deleteReminders(habitId: Long)
 
+    @Query("SELECT * FROM habit_days WHERE date = :date") fun observeDays(date: Int): Flow<List<HabitDay>>
+    @Query("SELECT * FROM habit_days WHERE date = :date") suspend fun days(date: Int): List<HabitDay>
+    @Query("SELECT * FROM habit_days WHERE habitId = :habitId AND date = :date") suspend fun day(habitId: Long, date: Int): HabitDay?
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertDay(day: HabitDay): Long
+    @Update suspend fun updateDay(day: HabitDay)
+
     @Query("SELECT * FROM habit_checkins WHERE date = :date") fun observeCheckIns(date: Int): Flow<List<HabitCheckIn>>
     @Query("SELECT * FROM habit_checkins WHERE date = :date") suspend fun checkIns(date: Int): List<HabitCheckIn>
     @Query("SELECT * FROM habit_checkins WHERE habitId = :habitId AND date = :date AND minute = :minute")
@@ -103,8 +122,20 @@ interface PlanDao {
     @Query("UPDATE plan_summaries SET midnightEmailSent = 1 WHERE date = :date") suspend fun markMidnight(date: Int)
 }
 
-@Database(entities = [PlanTask::class, Habit::class, HabitReminder::class, HabitCheckIn::class, PlanSummary::class], version = 1, exportSchema = false)
+@Database(entities = [PlanTask::class, Habit::class, HabitReminder::class, HabitCheckIn::class, HabitDay::class, PlanSummary::class], version = 2, exportSchema = false)
 abstract class PlanDatabase : RoomDatabase() { abstract fun dao(): PlanDao }
+
+private val PLAN_MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE habits ADD COLUMN targetCount INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE habits ADD COLUMN reminderMode TEXT NOT NULL DEFAULT 'ALARM'")
+        db.execSQL("""CREATE TABLE IF NOT EXISTS habit_days (
+            habitId INTEGER NOT NULL, date INTEGER NOT NULL, count INTEGER NOT NULL DEFAULT 0,
+            completedAt INTEGER, overdueEmailSent INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY(habitId, date), FOREIGN KEY(habitId) REFERENCES habits(id) ON DELETE CASCADE)""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_habit_days_date ON habit_days(date)")
+    }
+}
 
 /** 2026 年法定节假日与调休上班日；其他年份先按周一至周五，后续可继续补表。 */
 object WorkdayCalendar {
@@ -147,14 +178,15 @@ fun slotsFor(habits: List<Habit>, reminders: List<HabitReminder>, date: LocalDat
     }
 
 class PlanRepository(private val context: Context) {
-    private val db = Room.databaseBuilder(context, PlanDatabase::class.java, "plan.db").build()
+    private val db = Room.databaseBuilder(context, PlanDatabase::class.java, "plan.db")
+        .addMigrations(PLAN_MIGRATION_1_2).build()
     val dao = db.dao()
     private val mutex = Mutex()
 
     fun tasks(date: LocalDate): Flow<List<PlanTask>> = dao.observeTasks(date.toEpochDay().toInt())
     fun habits(): Flow<List<Habit>> = dao.observeHabits()
     fun reminders(): Flow<List<HabitReminder>> = dao.observeReminders()
-    fun checkIns(date: LocalDate): Flow<List<HabitCheckIn>> = dao.observeCheckIns(date.toEpochDay().toInt())
+    fun days(date: LocalDate): Flow<List<HabitDay>> = dao.observeDays(date.toEpochDay().toInt())
 
     suspend fun addTask(title: String, date: LocalDate, dueMinute: Int?, reminderMinute: Int?) = mutex.withLock {
         val clean = title.trim()
@@ -167,6 +199,13 @@ class PlanRepository(private val context: Context) {
         dao.updateTask(task.copy(completedAt = if (task.completedAt == null) System.currentTimeMillis() else null))
     }
 
+    suspend fun renameTask(id: Long, date: LocalDate, title: String) = mutex.withLock {
+        val clean = title.trim()
+        require(clean.isNotEmpty()) { "请写下计划内容" }
+        val task = dao.tasks(date.toEpochDay().toInt()).firstOrNull { it.id == id } ?: return@withLock
+        dao.updateTask(task.copy(title = clean))
+    }
+
     suspend fun deleteTask(id: Long) = mutex.withLock { dao.deleteTask(id) }
 
     suspend fun saveHabit(habit: Habit, reminderMinutes: List<Int>): Long = mutex.withLock {
@@ -174,81 +213,103 @@ class PlanRepository(private val context: Context) {
         require(clean.isNotEmpty()) { "请写下习惯名称" }
         require(reminderMinutes.isNotEmpty()) { "至少设置一个提醒时间" }
         val times = reminderMinutes.distinct().sorted().take(5)
-        val id = if (habit.id == 0L) dao.insertHabit(habit.copy(title = clean)) else {
-            dao.updateHabit(habit.copy(title = clean)); dao.deleteReminders(habit.id); habit.id
-        }
+        val id = if (habit.id == 0L) dao.insertHabit(habit.copy(title = clean))
+        else { dao.updateHabit(habit.copy(title = clean)); dao.deleteReminders(habit.id); habit.id }
         times.forEach { dao.insertReminder(HabitReminder(habitId = id, minute = it)) }
         id
     }
 
     suspend fun deleteHabit(id: Long) = mutex.withLock { dao.deleteHabit(id) }
 
-    /** 切换某个习惯时段的完成状态；完成后检查是否全天全部完成。 */
-    suspend fun toggleSlot(habitId: Long, date: LocalDate, minute: Int) = mutex.withLock {
-        val day = date.toEpochDay().toInt()
-        val existing = dao.checkIn(habitId, day, minute)
-        if (existing?.completedAt != null) {
-            dao.updateCheckIn(existing.copy(completedAt = null))
-        } else if (existing == null) {
-            dao.insertCheckIn(HabitCheckIn(habitId = habitId, date = day, minute = minute, completedAt = System.currentTimeMillis()))
+    /** 单次习惯切换完成；计数习惯 +1（到目标后保持完成）。 */
+    suspend fun toggleHabit(habitId: Long, date: LocalDate) = mutex.withLock {
+        val habit = dao.habit(habitId) ?: return@withLock
+        if (!habit.isDue(date)) return@withLock
+        val dayNumber = date.toEpochDay().toInt()
+        val target = habit.targetCount.coerceAtLeast(1)
+        val current = dao.day(habitId, dayNumber) ?: HabitDay(habitId = habitId, date = dayNumber)
+        val next = if (target == 1) {
+            if (current.count >= 1) current.copy(count = 0, completedAt = null)
+            else current.copy(count = 1, completedAt = System.currentTimeMillis())
         } else {
-            dao.updateCheckIn(existing.copy(completedAt = System.currentTimeMillis()))
+            if (current.count >= target) current
+            else current.copy(count = current.count + 1,
+                completedAt = if (current.count + 1 >= target) System.currentTimeMillis() else null)
         }
-        if (existing?.completedAt == null) context.getSystemService(NotificationManager::class.java)
-            .cancel((habitId.toString() + date + minute).hashCode())
+        if (dao.day(habitId, dayNumber) == null) dao.insertDay(next) else dao.updateDay(next)
         maybeSendAllDone(date)
     }
 
-    suspend fun dueSlots(date: LocalDate): List<HabitSlot> = slotsFor(dao.habits(), dao.allReminders(), date)
+    /** 通知栏的「完成」只加一次，不撤销已有完成。 */
+    suspend fun completeHabit(habitId: Long, date: LocalDate) = mutex.withLock {
+        val habit = dao.habit(habitId) ?: return@withLock
+        if (!habit.isDue(date)) return@withLock
+        val dayNumber = date.toEpochDay().toInt()
+        val target = habit.targetCount.coerceAtLeast(1)
+        val current = dao.day(habitId, dayNumber) ?: HabitDay(habitId = habitId, date = dayNumber)
+        if (current.count >= target) return@withLock
+        val next = current.copy(count = current.count + 1,
+            completedAt = if (current.count + 1 >= target) System.currentTimeMillis() else null)
+        if (dao.day(habitId, dayNumber) == null) dao.insertDay(next) else dao.updateDay(next)
+        maybeSendAllDone(date)
+    }
 
-    suspend fun completedSlotKeys(date: LocalDate): Set<Pair<Long, Int>> =
-        dao.checkIns(date.toEpochDay().toInt()).filter { it.completedAt != null }.map { it.habitId to it.minute }.toSet()
+    suspend fun dueHabits(date: LocalDate): List<Habit> = dao.habits().filter { it.isDue(date) }
+
+    private suspend fun dayMap(date: LocalDate): Map<Long, HabitDay> =
+        dao.days(date.toEpochDay().toInt()).associateBy { it.habitId }
+
+    private fun Habit.isComplete(day: HabitDay?): Boolean =
+        (day?.count ?: 0) >= targetCount.coerceAtLeast(1)
+
+    private suspend fun doneCount(date: LocalDate): Int {
+        val days = dayMap(date)
+        return dueHabits(date).count { it.isComplete(days[it.id]) }
+    }
 
     suspend fun maybeSendAllDone(date: LocalDate) {
-        val slots = dueSlots(date)
-        if (slots.isEmpty()) return
-        val done = completedSlotKeys(date)
-        if (!slots.all { (it.habit.id to it.minute) in done }) return
+        val habits = dueHabits(date)
+        if (habits.isEmpty()) return
+        val days = dayMap(date)
+        if (!habits.all { it.isComplete(days[it.id]) }) return
         val day = date.toEpochDay().toInt()
         dao.ensureSummary(PlanSummary(day))
         if (dao.summary(day)?.allDoneEmailSent == true) return
         dao.markAllDone(day)
-        EmailNotifier.habitsAllDone(context, date, slots.size)
+        EmailNotifier.habitsAllDone(context, date, habits.size)
     }
 
     suspend fun markOverdue(habitId: Long, date: LocalDate, minute: Int) {
-        val day = date.toEpochDay().toInt()
+        val dayNumber = date.toEpochDay().toInt()
         val habit = dao.habit(habitId) ?: return
         if (!habit.isDue(date)) return
         if (dao.reminders(habitId).none { it.minute == minute }) return
-        val existing = dao.checkIn(habitId, day, minute)
-        if (existing?.completedAt != null || existing?.overdueEmailSent == true) return
-        if (existing == null) dao.insertCheckIn(HabitCheckIn(habitId = habitId, date = day, minute = minute, overdueEmailSent = true))
-        else dao.updateCheckIn(existing.copy(overdueEmailSent = true))
-        val done = completedSlotKeys(date).size
-        val total = dueSlots(date).size
-        EmailNotifier.habitOverdue(context, date, habit.title, minute, done, total)
+        val current = dao.day(habitId, dayNumber)
+        if (habit.isComplete(current) || current?.overdueEmailSent == true) return
+        val next = (current ?: HabitDay(habitId = habitId, date = dayNumber)).copy(overdueEmailSent = true)
+        if (current == null) dao.insertDay(next) else dao.updateDay(next)
+        EmailNotifier.habitOverdue(context, date, habit.title, minute, doneCount(date), dueHabits(date).size)
     }
 
-    /** 午夜汇总：只有全部完成但没来得及发时补发全部完成；否则发未完成汇总。 */
+    /** 午夜汇总：全部完成但没来得及发时补发全部完成；否则发未完成汇总。 */
     suspend fun midnightSummary(date: LocalDate) {
-        val slots = dueSlots(date)
-        if (slots.isEmpty()) return
-        val day = date.toEpochDay().toInt()
-        dao.ensureSummary(PlanSummary(day))
-        if (dao.summary(day)?.midnightEmailSent == true) return
-        val done = completedSlotKeys(date)
-        val complete = slots.all { (it.habit.id to it.minute) in done }
-        if (complete) {
-            if (dao.summary(day)?.allDoneEmailSent != true) {
-                dao.markAllDone(day)
-                EmailNotifier.habitsAllDone(context, date, slots.size)
+        val habits = dueHabits(date)
+        if (habits.isEmpty()) return
+        val dayNumber = date.toEpochDay().toInt()
+        dao.ensureSummary(PlanSummary(dayNumber))
+        if (dao.summary(dayNumber)?.midnightEmailSent == true) return
+        val days = dayMap(date)
+        val done = habits.count { it.isComplete(days[it.id]) }
+        if (done == habits.size) {
+            if (dao.summary(dayNumber)?.allDoneEmailSent != true) {
+                dao.markAllDone(dayNumber)
+                EmailNotifier.habitsAllDone(context, date, habits.size)
             }
         } else {
-            val missed = slots.filter { (it.habit.id to it.minute) !in done }
-            EmailNotifier.habitsIncomplete(context, date, slots.size, done.size, missed)
+            val missed = habits.filterNot { it.isComplete(days[it.id]) }.map { it.title }
+            EmailNotifier.habitsIncomplete(context, date, habits.size, done, missed)
         }
-        dao.markMidnight(day)
+        dao.markMidnight(dayNumber)
     }
 }
 

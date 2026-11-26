@@ -19,6 +19,7 @@ object PlanScheduler {
     const val EXTRA_DATE = "date"
     const val EXTRA_MINUTE = "minute"
     const val CHANNEL = "habit_alarm"
+    const val CHANNEL_NOTIFY = "habit_notify"
 
     private fun req(vararg parts: Any): Int = parts.joinToString(":").hashCode()
 
@@ -26,11 +27,17 @@ object PlanScheduler {
 
     fun ensureChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        if (manager.getNotificationChannel(CHANNEL) != null) return
-        manager.createNotificationChannel(NotificationChannel(CHANNEL, "习惯闹钟", NotificationManager.IMPORTANCE_HIGH).apply {
-            description = "习惯的定时闹钟提醒"
-            enableVibration(true)
-        })
+        if (manager.getNotificationChannel(CHANNEL) == null) {
+            manager.createNotificationChannel(NotificationChannel(CHANNEL, "习惯闹钟", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "习惯的闹钟提醒"
+                enableVibration(true)
+            })
+        }
+        if (manager.getNotificationChannel(CHANNEL_NOTIFY) == null) {
+            manager.createNotificationChannel(NotificationChannel(CHANNEL_NOTIFY, "习惯通知", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "习惯的普通通知提醒"
+            })
+        }
     }
 
     suspend fun rebuild(context: Context) {
@@ -44,9 +51,9 @@ object PlanScheduler {
             val slots = slotsFor(habits, reminders, date)
             for ((habit, minute) in slots) {
                 val at = atMillis(date, minute)
-                if (at > now) setAlarm(context, at, habitAlarm(context, habit.id, date, minute), "h:${habit.id}:${date.toEpochDay()}:$minute".hashCode())
+                if (at > now) setAlarm(context, at, habitAlarm(context, habit.id, date, minute), "h:${habit.id}:${date.toEpochDay()}:$minute".hashCode(), habit.reminderMode == "ALARM")
                 val overdue = at + 2 * 60 * 60_000L
-                if (overdue > now) setAlarm(context, overdue, overdueAlarm(context, habit.id, date, minute), "o:${habit.id}:${date.toEpochDay()}:$minute".hashCode())
+                if (overdue > now) setAlarm(context, overdue, overdueAlarm(context, habit.id, date, minute), "o:${habit.id}:${date.toEpochDay()}:$minute".hashCode(), alarm = false)
             }
         }
         val nextMidnight = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -59,14 +66,16 @@ object PlanScheduler {
         else manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextMidnight, midnight)
     }
 
-    private fun setAlarm(context: Context, at: Long, operation: PendingIntent, requestCode: Int) {
+    private fun setAlarm(context: Context, at: Long, operation: PendingIntent, requestCode: Int, alarm: Boolean) {
         val manager = context.getSystemService(AlarmManager::class.java)
         val show = PendingIntent.getActivity(context, requestCode,
             Intent(context, MainActivity::class.java).putExtra("plan", true), flags())
         if (Build.VERSION.SDK_INT >= 31 && !manager.canScheduleExactAlarms()) {
             manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, operation)
-        } else {
+        } else if (alarm) {
             manager.setAlarmClock(AlarmManager.AlarmClockInfo(at, show), operation)
+        } else {
+            manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, operation)
         }
     }
 
@@ -87,14 +96,15 @@ object PlanScheduler {
 
     fun notification(context: Context, habit: Habit, date: LocalDate, minute: Int): Notification {
         ensureChannel(context)
+        val channel = if (habit.reminderMode == "ALARM") CHANNEL else CHANNEL_NOTIFY
         val open = PendingIntent.getActivity(context, req("open", habit.id, minute),
             Intent(context, MainActivity::class.java).putExtra("plan", true), flags())
-        return NotificationCompat.Builder(context, CHANNEL)
+        return NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_moon)
             .setContentTitle("⏰ ${habit.title}")
             .setContentText("${minutesText(minute)} · 点完成打卡")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setPriority(if (habit.reminderMode == "ALARM") NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(if (habit.reminderMode == "ALARM") NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(open)
             .addAction(0, "完成", completeIntent(context, habit.id, date, minute))
@@ -129,12 +139,12 @@ class PlanAlarmReceiver : BroadcastReceiver() {
                 if (action == PlanScheduler.ACTION_OVERDUE) {
                     app.planRepository.markOverdue(habitId, date, minute)
                 } else if (action == PlanScheduler.ACTION_COMPLETE) {
-                    app.planRepository.toggleSlot(habitId, date, minute)
+                    app.planRepository.completeHabit(habitId, date)
                     context.getSystemService(NotificationManager::class.java).cancel((habitId.toString() + date + minute).hashCode())
                 } else if (action == PlanScheduler.ACTION_HABIT) {
                     if (!habit.isDue(date)) return@launch
                     if (app.planRepository.dao.reminders(habitId).none { it.minute == minute }) return@launch
-                    val done = app.planRepository.dao.checkIn(habitId, date.toEpochDay().toInt(), minute)?.completedAt != null
+                    val done = (app.planRepository.dao.day(habitId, date.toEpochDay().toInt())?.count ?: 0) >= habit.targetCount.coerceAtLeast(1)
                     if (!done) {
                         PlanScheduler.ensureChannel(context)
                         context.getSystemService(NotificationManager::class.java)

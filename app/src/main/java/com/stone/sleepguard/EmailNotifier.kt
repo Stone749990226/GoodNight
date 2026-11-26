@@ -101,7 +101,7 @@ object EmailNotifier {
     fun habitsAllDone(context: Context, date: java.time.LocalDate, total: Int) = dispatch(context) { _, role ->
         val name = roleName(role); val partner = partnerName(role)
         Payload("HABITS_ALL_DONE", "✅ $name 完成了今天的全部习惯", """
-            $name 在 ${date.monthValue} 月 ${date.dayOfMonth} 日完成了全部 $total 个习惯时段。
+            $name 在 ${date.monthValue} 月 ${date.dayOfMonth} 日完成了全部 $total 个习惯。
             今天的约定都做到了。
 
             —— 晚安，$partner 🫶
@@ -112,19 +112,17 @@ object EmailNotifier {
         val name = roleName(role); val partner = partnerName(role)
         Payload("HABIT_OVERDUE", "⏰ $name 的习惯「$habit」逾期未完成", """
             $name 今天 ${minutesText(minute)} 的「$habit」已经过了 2 小时，还没有完成。
-            今天已完成 $done / $total 个习惯时段。
+            今天已完成 $done / $total 个习惯。
 
             —— 晚安，$partner 🫶
         """.trimIndent())
     }
 
-    fun habitsIncomplete(context: Context, date: java.time.LocalDate, total: Int, done: Int, missed: List<HabitSlot>) = dispatch(context) { _, role ->
+    fun habitsIncomplete(context: Context, date: java.time.LocalDate, total: Int, done: Int, missed: List<String>) = dispatch(context) { _, role ->
         val name = roleName(role); val partner = partnerName(role)
-        val lines = missed.groupBy { it.habit.title }.entries.joinToString("\n") { (habit, slots) ->
-            "  · $habit：${slots.joinToString("、") { minutesText(it.minute) }}"
-        }
+        val lines = missed.joinToString("\n") { "  · $it" }
         Payload("HABITS_INCOMPLETE", "🌙 $name 今天的习惯完成情况", """
-            $name 今天完成了 $done / $total 个习惯时段。
+            $name 今天完成了 $done / $total 个习惯。
             还没完成：
             $lines
 
