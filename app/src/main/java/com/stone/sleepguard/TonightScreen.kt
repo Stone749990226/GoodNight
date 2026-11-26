@@ -82,7 +82,10 @@ internal fun TonightScreen(active: NightRecord?, lastAwake: NightRecord?, now: L
         if (active != null) OutlinedButton(onClick = onWake, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(18.dp)) { Text("我醒了，去和 $partner 说早安 ☀️", color = Cream, fontSize = 15.sp) }
         val allDone = planTotal + habitTotal > 0 && planDone == planTotal && habitDone == habitTotal
         val praise = if (allDone) " · ${partner}真棒！🥰" else ""
-        Text("今日完成情况：计划 $planDone/$planTotal，习惯 $habitDone/$habitTotal$praise\n目标 ${minutesText(settings.targetBed)} 放下手机 · ${minutesText(settings.targetWake)} 起床", fontSize = 12.sp, lineHeight = 20.sp, color = Muted)
+        Text("今日TODO：计划 $planDone/$planTotal，习惯 $habitDone/$habitTotal$praise", fontSize = 10.sp,
+            lineHeight = 15.sp, color = Muted, maxLines = 1, softWrap = false)
+        Text("目标 ${minutesText(settings.targetBed)} 放下手机 · ${minutesText(settings.targetWake)} 起床", fontSize = 11.sp,
+            lineHeight = 17.sp, color = Muted)
     }
     val overlayGranted = remember(permissionTick) { Settings.canDrawOverlays(context) }
     val notifyGranted = remember(permissionTick) { context.getSystemService(NotificationManager::class.java).areNotificationsEnabled() }
