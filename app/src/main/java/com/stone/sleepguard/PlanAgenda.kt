@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -46,7 +47,7 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
 @Composable internal fun DayAgenda(tasks: List<PlanTask>, habits: List<Habit>, reminders: List<HabitReminder>,
     days: List<HabitDay>, timeline: Boolean, canCheck: Boolean, checks: List<HabitCheckIn>, onEditTask: (PlanTask) -> Unit,
     onToggleTask: (Long) -> Unit, onHabit: (Habit) -> Unit, onStep: (Long, Int?, Boolean) -> Unit,
-    onSwipeTask: (Long) -> Unit, onSwipeHabit: (Long) -> Unit, onCompleted: (() -> Unit) -> Unit, onStats: () -> Unit) {
+    onSwipeTask: (Long) -> Unit, onSwipeHabit: (Long) -> Unit, onCompleted: (String, () -> Unit) -> Unit, onStats: () -> Unit) {
     val times = reminders.groupBy { it.habitId }
     val records = days.associateBy { it.habitId }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -69,16 +70,20 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
             else if (timeline) "" else times[habit?.id].orEmpty().joinToString(" · ") { minutesText(it.minute) }
         SwipeRight(onSwipe = {
             if (task != null) {
-                if (!done) onCompleted { onToggleTask(task.id) }
+                if (!done) onCompleted("已完成：${task.title}！bb真厉害！💗") { onToggleTask(task.id) }
                 onSwipeTask(task.id)
             } else if (habit != null) {
-                if (count < target) onCompleted { onStep(habit.id, null, true) }
+                if (count < target) {
+                    val text = if (count + 1 >= target) "已完成：${habit.title}！bb真厉害！💗"
+                    else "${habit.title} +1，bb真厉害！💗"
+                    onCompleted(text) { onStep(habit.id, null, true) }
+                }
                 onSwipeHabit(habit.id)
             }
         }) {
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (task != null) Checkbox(done, {
-                    if (!done) onCompleted { onToggleTask(task.id) }
+                    if (!done) onCompleted("已完成：${task.title}！bb真厉害！💗") { onToggleTask(task.id) }
                     onToggleTask(task.id)
                 })
                 else Box(Modifier.size(38.dp).background(Mint.copy(alpha = .11f), CircleShape), contentAlignment = Alignment.Center) { Text(habit!!.glyph(), fontSize = 21.sp) }
@@ -88,7 +93,11 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
                     if (meta.isNotEmpty()) Text(meta, color = Muted, fontSize = 12.sp)
                 }
                 if (habit != null) TextButton(enabled = canCheck && (!done || (entry.minute == null && target == 1)), onClick = {
-                    if (!done) onCompleted { onStep(habit.id, null, true) }
+                    if (!done) {
+                        val text = if (target == 1 || count + 1 >= target) "已完成：${habit.title}！bb真厉害！💗"
+                        else "${habit.title} +1，bb真厉害！💗"
+                        onCompleted(text) { onStep(habit.id, null, true) }
+                    }
                     onStep(habit.id, entry.minute, done)
                 }) {
                     Text(if (done) "$count/$target ✓" else "$count/$target ＋")
@@ -208,8 +217,9 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
                 if (dx > 60.dp.toPx()) onSwipe()
                 dx = 0f
             })
-    }) {
-        Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(dx.roundToInt(), 0) }) { content() }
+    }.clip(RoundedCornerShape(12.dp)).background(Mint)) {
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel)
+            .offset { androidx.compose.ui.unit.IntOffset(dx.roundToInt(), 0) }) { content() }
     }
 }
 

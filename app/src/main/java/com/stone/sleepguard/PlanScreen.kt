@@ -20,12 +20,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import android.content.Context
-import android.graphics.drawable.GradientDrawable
-import android.view.Gravity
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.widget.Toast
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -56,6 +50,7 @@ internal fun PlanScreen(
     onDeleteHabit: (Long) -> Unit,
     onHabitStep: (Long, LocalDate, Int?, Boolean) -> Unit,
     onHabitSwipe: (Long, LocalDate) -> Unit,
+    onCompleted: (String, () -> Unit) -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("plan_view", 0) }
@@ -180,7 +175,7 @@ internal fun PlanScreen(
         onEditTask = { editingTask = it }, onToggleTask = onToggleTask,
         onHabit = { detail = it }, onStep = { id, minute, undo -> onHabitStep(id, selectedDate, minute, undo) },
         onSwipeTask = onToggleTask, onSwipeHabit = { id -> onHabitSwipe(id, selectedDate) },
-        onCompleted = { undo -> showDoneToast(context, undo) },
+        onCompleted = onCompleted,
         onStats = { showStats = true })
     Spacer(Modifier.height(64.dp))
     if (addTask || editingTask != null) TaskSheet(editingTask, selectedDate,
@@ -354,36 +349,4 @@ private fun frequencyText(habit: Habit): String = when (habit.frequency) {
         .joinToString("、") { LocalDate.of(2026, 3, 2).plusDays(it.toLong()).dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.CHINA) }
     FREQ_WORKDAYS -> "工作日"
     else -> "每天"
-}
-
-private fun showDoneToast(context: Context, onUndo: () -> Unit) {
-    val density = context.resources.displayMetrics.density
-    fun dp(n: Int) = (n * density).toInt()
-    val row = LinearLayout(context).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(16), dp(10), dp(10), dp(10))
-        background = GradientDrawable().apply {
-            setColor(android.graphics.Color.rgb(22, 36, 46))
-            cornerRadius = dp(18).toFloat()
-            setStroke(dp(1), android.graphics.Color.rgb(46, 71, 82))
-        }
-    }
-    val toast = Toast(context).apply { duration = Toast.LENGTH_SHORT }
-    val message = TextView(context).apply {
-        text = "已完成，bb真厉害！💗"
-        setTextColor(android.graphics.Color.rgb(232, 239, 233))
-        textSize = 14f
-        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-    }
-    val undo = TextView(context).apply {
-        text = "撤销"
-        setTextColor(android.graphics.Color.rgb(168, 220, 203))
-        textSize = 14f
-        setPadding(dp(14), dp(4), dp(8), dp(4))
-        setOnClickListener { onUndo(); toast.cancel() }
-    }
-    row.addView(message); row.addView(undo)
-    toast.view = row
-    toast.show()
 }

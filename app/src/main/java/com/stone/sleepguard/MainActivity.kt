@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
                 val tick by permissionTick.collectAsStateWithLifecycle()
                 val message by app.message.collectAsStateWithLifecycle()
                 val snackbar = remember { SnackbarHostState() }
+                var completionNotice by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) }
                 var tab by rememberSaveable { mutableIntStateOf(0) }
                 var quickAdd by rememberSaveable { mutableStateOf(false) }
                 var planDate by rememberSaveable { mutableLongStateOf(LocalDate.now().toEpochDay()) }
@@ -83,6 +84,12 @@ class MainActivity : ComponentActivity() {
                     if (intent.getBooleanExtra("plan", false)) { tab = 1; planDate = intent.getLongExtra("planDate", LocalDate.now().toEpochDay()); intent.removeExtra("plan") }
                 }
                 LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); if (app.message.value == it) app.message.value = null } }
+                LaunchedEffect(completionNotice) {
+                    val notice = completionNotice ?: return@LaunchedEffect
+                    val result = snackbar.showSnackbar(notice.first, actionLabel = "撤销", duration = SnackbarDuration.Short)
+                    if (result == SnackbarResult.ActionPerformed) notice.second()
+                    completionNotice = null
+                }
                 LaunchedEffect(deleted) {
                     val record = deleted ?: return@LaunchedEffect
                     val result = snackbar.showSnackbar("已删除 ${record.night.date} 晚的记录", actionLabel = "撤销", withDismissAction = true, duration = SnackbarDuration.Long)
@@ -159,7 +166,8 @@ class MainActivity : ComponentActivity() {
                                     onSaveHabit = { habit, times -> runAction { planRepo.saveHabit(habit, times); PlanScheduler.rebuild(this@MainActivity) } },
                                     onDeleteHabit = { id -> runAction { planRepo.deleteHabit(id); PlanScheduler.rebuild(this@MainActivity) } },
                                     onHabitStep = { id, date, minute, undo -> runAction { planRepo.changeHabit(id, date, minute, undo) } },
-                                    onHabitSwipe = { id, date -> runAction { planRepo.swipeHabit(id, date) } })
+                                    onHabitSwipe = { id, date -> runAction { planRepo.swipeHabit(id, date) } },
+                                    onCompleted = { text, undo -> completionNotice = text to undo })
                                 2 -> RecordsScreen(records, { feelingId = it }, { photo(it) }, { share(it) }, { id, text -> runAction { app.repository.reason(id, text) } },
                                     onEdit = { id, edit -> runAction { app.repository.edit(id, edit) } },
                                     onDelete = { id -> runAction { app.repository.deleteNight(id)?.let { deleted = it } } },
