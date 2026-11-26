@@ -93,7 +93,7 @@ internal fun TonightScreen(active: NightRecord?, lastAwake: NightRecord?, now: L
         Text("最近一晚", fontSize = 16.sp, color = Cream, fontWeight = FontWeight.Medium)
         SoftCard {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Metric("最终就寝", clock(lastAwake.finalBedAt), Modifier.weight(1f)); Metric("点击醒了", clock(lastAwake.night.wakeAt), Modifier.weight(1f)); Metric("夜间中断", "${lastAwake.disruptions.size} 次", Modifier.weight(1f))
+                Metric("最终就寝", clock(lastAwake.finalBedAt), Modifier.weight(1f)); Metric("起床时间", clock(lastAwake.night.wakeAt), Modifier.weight(1f)); Metric("夜间中断", "${lastAwake.disruptions.size} 次", Modifier.weight(1f))
             }
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

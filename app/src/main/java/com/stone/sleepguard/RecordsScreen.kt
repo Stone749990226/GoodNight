@@ -117,7 +117,7 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
 
 @Composable private fun Trend(records: List<NightRecord>) {
     val sorted = records.filter { it.valid }.sortedBy { it.night.firstSleepAt }
-    listOf("就寝声明" to Mint, "点击醒来" to Amber).forEachIndexed { band, (label, color) ->
+    listOf("入睡时间" to Mint, "起床时间" to Amber).forEachIndexed { band, (label, color) ->
         val values = if (band == 0) sorted.map { bedMinutes(it.finalBedAt!!) } else sorted.map { localMinutes(it.night.wakeAt!!) }
         val low = ((values.minOrNull() ?: if (band == 0) 1410 else 450) / 30 * 30) - 30
         val high = ((values.maxOrNull() ?: if (band == 0) 1410 else 450) / 30 * 30) + 60
@@ -173,7 +173,7 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
 @Composable private fun SummaryTable(records: List<NightRecord>, onSelect: (Long) -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Panel).horizontalScroll(rememberScrollState()).padding(16.dp)) {
         fun Modifier.cell() = width(112.dp).padding(vertical = 10.dp, horizontal = 4.dp)
-        Row { listOf("夜晚", "首次说晚安", "最终就寝", "点击醒了", "中断次数", "记录间隔", "感受").forEach { Text(it, Modifier.cell(), fontSize = 12.sp, color = Mint) } }
+        Row { listOf("夜晚", "入睡时间", "最终就寝", "起床时间", "中断次数", "记录间隔", "感受").forEach { Text(it, Modifier.cell(), fontSize = 12.sp, color = Mint) } }
         records.forEach { r ->
             HorizontalDivider(color = Color(0xFF2B3C46))
             Row(Modifier.fillMaxWidth().clickable { onSelect(r.night.id) }) {
@@ -258,7 +258,7 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
         Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TimeField("最终就寝", minutesText(bedMinutes), Modifier.weight(1f)) { editing = "bed" }
-                TimeField("点击醒了", minutesText(wakeMinutes), Modifier.weight(1f)) { editing = "wake" }
+                TimeField("起床时间", minutesText(wakeMinutes), Modifier.weight(1f)) { editing = "wake" }
             }
             val visible = record.disruptions.filterNot { it.id in removed }
             if (visible.isNotEmpty()) {
@@ -285,7 +285,7 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
     }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
     when (editing) {
         "bed" -> WheelTimeDialog(initial = bedMinutes, title = "最终就寝", onDismiss = { editing = null }) { bedMinutes = it; editing = null }
-        "wake" -> WheelTimeDialog(initial = wakeMinutes, title = "点击醒了", onDismiss = { editing = null }) { wakeMinutes = it; editing = null }
+        "wake" -> WheelTimeDialog(initial = wakeMinutes, title = "起床时间", onDismiss = { editing = null }) { wakeMinutes = it; editing = null }
     }
 }
 
