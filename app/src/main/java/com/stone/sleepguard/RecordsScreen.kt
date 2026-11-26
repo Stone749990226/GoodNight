@@ -284,8 +284,8 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
         TextButton(enabled = error == null, onClick = { onSave(NightEdit(bedAt, wakeAt, reasons.filterKeys { it !in removed }, removed)) }) { Text("保存修改") }
     }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } })
     when (editing) {
-        "bed" -> WheelTimeDialog(initial = bedMinutes, title = "最终就寝", onDismiss = { editing = null }) { bedMinutes = it; editing = null }
-        "wake" -> WheelTimeDialog(initial = wakeMinutes, title = "起床时间", onDismiss = { editing = null }) { wakeMinutes = it; editing = null }
+        "bed" -> ClockTimeDialog(initial = bedMinutes, title = "最终就寝", onDismiss = { editing = null }) { bedMinutes = it; editing = null }
+        "wake" -> ClockTimeDialog(initial = wakeMinutes, title = "起床时间", onDismiss = { editing = null }) { wakeMinutes = it; editing = null }
     }
 }
 

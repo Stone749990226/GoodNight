@@ -161,7 +161,7 @@ import kotlinx.coroutines.delay
         containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
 }
 @Composable private fun EditTimeDialog(initial: Int, title: String, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
-    WheelTimeDialog(initial = initial, title = title, onDismiss = onDismiss, onConfirm = onSave)
+    ClockTimeDialog(initial = initial, title = title, onDismiss = onDismiss, onConfirm = onSave)
 }
 @Composable private fun SettingRow(label: String, value: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).heightIn(min = 56.dp).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {

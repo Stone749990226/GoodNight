@@ -94,15 +94,13 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
                 Column(Modifier.weight(1f).clickable { if (task != null) onEditTask(task) else onHabit(habit!!) }.padding(horizontal = 10.dp, vertical = 5.dp)) {
                     Text(task?.title ?: habit!!.title, color = if (done) Muted else Cream, fontSize = 16.sp)
                     if (task?.note?.isNotBlank() == true) Text(task.note, color = Muted, fontSize = 12.sp, maxLines = 2)
-                    if (habit != null) {
-                        val meta = listOf(marker, schedule).filter { it.isNotEmpty() }.joinToString("  ")
-                        if (meta.isNotEmpty()) Text(meta, color = Muted, fontSize = 12.sp)
-                    }
                 }
                 if (task != null) Text(
                     listOf(marker, schedule).filter { it.isNotEmpty() }.joinToString(" "),
                     color = Muted, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
-                if (habit != null) TextButton(enabled = canCheck && !done, onClick = {
+                if (habit != null) {
+                    if (marker.isNotEmpty()) Text(marker, fontSize = 17.sp, modifier = Modifier.padding(end = 2.dp))
+                    TextButton(enabled = canCheck && !done, onClick = {
                     if (!done) {
                         val text = if (target == 1 || count + 1 >= target) "已完成：${habit.title}！bb真厉害！💗"
                         else "${habit.title} +1，bb真厉害！💗"
@@ -111,6 +109,7 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
                     onStep(habit.id, entry.minute, false)
                 }) {
                     Text(if (done) "$count/$target ✓" else "$count/$target ＋")
+                }
                 }
             }
         }
@@ -210,7 +209,7 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
         }
         LaunchedEffect(Unit) { if (task == null) focus.requestFocus() }
     }
-    if (picking.isNotEmpty()) WheelTimeDialog(if (picking == "开始") start ?: 540 else end ?: ((start ?: 540) + 30).coerceAtMost(1439), "${picking}时间", onDismiss = { picking = "" }) {
+    if (picking.isNotEmpty()) ClockTimeDialog(if (picking == "开始") start ?: 540 else end ?: ((start ?: 540) + 30).coerceAtMost(1439), "${picking}时间", onDismiss = { picking = "" }) {
         if (picking == "开始") start = it else end = it
         picking = ""
     }

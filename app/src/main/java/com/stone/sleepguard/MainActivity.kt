@@ -311,6 +311,6 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable private fun NightWakeDialog(initial: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
-    WheelTimeDialog(initial = initial, title = "今晚，几点醒？", subtitle = "给自己一个起床约定",
+    ClockTimeDialog(initial = initial, title = "今晚，几点醒？", subtitle = "给自己一个起床约定",
         confirmLabel = "开始晚安", onDismiss = onDismiss, onConfirm = onConfirm)
 }

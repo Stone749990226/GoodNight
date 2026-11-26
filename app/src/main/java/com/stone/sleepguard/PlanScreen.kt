@@ -250,7 +250,7 @@ internal fun PlanScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     var pickingTime by remember { mutableStateOf(false) }
     var iconsExpanded by remember { mutableStateOf(false) }
-    if (pickingTime) WheelTimeDialog(initial = java.time.LocalTime.now().hour * 60, title = "提醒时间", confirmLabel = "添加",
+    if (pickingTime) ClockTimeDialog(initial = java.time.LocalTime.now().hour * 60, title = "提醒时间", confirmLabel = "添加",
         onDismiss = { pickingTime = false }, onConfirm = { minute ->
             if (times.size < 5 && minute !in times) times = (times + minute).sorted()
             pickingTime = false
