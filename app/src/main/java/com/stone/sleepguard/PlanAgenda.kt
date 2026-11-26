@@ -2,6 +2,7 @@ package com.stone.sleepguard
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,10 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.*
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 internal val habitIcons = listOf(
     "💧", "💊", "👁️", "📖", "🏃", "🥛", "🌙", "🍎",
@@ -42,7 +46,7 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
 @Composable internal fun DayAgenda(tasks: List<PlanTask>, habits: List<Habit>, reminders: List<HabitReminder>,
     days: List<HabitDay>, timeline: Boolean, canCheck: Boolean, checks: List<HabitCheckIn>, onEditTask: (PlanTask) -> Unit,
     onToggleTask: (Long) -> Unit, onHabit: (Habit) -> Unit, onStep: (Long, Int?, Boolean) -> Unit,
-    onStats: () -> Unit) {
+    onSwipeTask: (Long) -> Unit, onSwipeHabit: (Long) -> Unit, onCompleted: (() -> Unit) -> Unit, onStats: () -> Unit) {
     val times = reminders.groupBy { it.habitId }
     val records = days.associateBy { it.habitId }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -63,16 +67,32 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
         val marker = if (!alarm) "" else if (task?.alarm == true || habit?.reminderMode == "ALARM") "⏰" else "🔔"
         val schedule = if (task != null) task.dueMinute?.let { minutesText(it) + (task.endMinute?.let { end -> "–${minutesText(end)}" } ?: "") } ?: "全天"
             else if (timeline) "" else times[habit?.id].orEmpty().joinToString(" · ") { minutesText(it.minute) }
-        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (task != null) Checkbox(done, { onToggleTask(task.id) })
-            else Box(Modifier.size(38.dp).background(Mint.copy(alpha = .11f), CircleShape), contentAlignment = Alignment.Center) { Text(habit!!.glyph(), fontSize = 21.sp) }
-            Column(Modifier.weight(1f).clickable { if (task != null) onEditTask(task) else onHabit(habit!!) }.padding(horizontal = 10.dp, vertical = 8.dp)) {
-                Text(task?.title ?: habit!!.title, color = if (done) Muted else Cream, fontSize = 16.sp)
-                val meta = listOf(marker, schedule).filter { it.isNotEmpty() }.joinToString("  ")
-                if (meta.isNotEmpty()) Text(meta, color = Muted, fontSize = 12.sp)
+        SwipeRight(onSwipe = {
+            if (task != null) {
+                if (!done) onCompleted { onToggleTask(task.id) }
+                onSwipeTask(task.id)
+            } else if (habit != null) {
+                if (count < target) onCompleted { onStep(habit.id, null, true) }
+                onSwipeHabit(habit.id)
             }
-            if (habit != null) TextButton(enabled = canCheck && (!done || (entry.minute == null && target == 1)), onClick = { onStep(habit.id, entry.minute, done) }) {
-                Text(if (done) "$count/$target ✓" else "$count/$target ＋")
+        }) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (task != null) Checkbox(done, {
+                    if (!done) onCompleted { onToggleTask(task.id) }
+                    onToggleTask(task.id)
+                })
+                else Box(Modifier.size(38.dp).background(Mint.copy(alpha = .11f), CircleShape), contentAlignment = Alignment.Center) { Text(habit!!.glyph(), fontSize = 21.sp) }
+                Column(Modifier.weight(1f).clickable { if (task != null) onEditTask(task) else onHabit(habit!!) }.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                    Text(task?.title ?: habit!!.title, color = if (done) Muted else Cream, fontSize = 16.sp)
+                    val meta = listOf(marker, schedule).filter { it.isNotEmpty() }.joinToString("  ")
+                    if (meta.isNotEmpty()) Text(meta, color = Muted, fontSize = 12.sp)
+                }
+                if (habit != null) TextButton(enabled = canCheck && (!done || (entry.minute == null && target == 1)), onClick = {
+                    if (!done) onCompleted { onStep(habit.id, null, true) }
+                    onStep(habit.id, entry.minute, done)
+                }) {
+                    Text(if (done) "$count/$target ✓" else "$count/$target ＋")
+                }
             }
         }
     }
@@ -171,6 +191,26 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
         picking = ""
     }
     if (deleting && task != null) AlertDialog(onDismissRequest = { deleting = false }, title = { Text("删除这项计划？") }, confirmButton = { TextButton(onClick = { onDelete(task.id) }) { Text("删除") } }, dismissButton = { TextButton(onClick = { deleting = false }) { Text("保留") } })
+}
+
+@Composable private fun SwipeRight(onSwipe: () -> Unit, content: @Composable () -> Unit) {
+    var dx by remember { mutableFloatStateOf(0f) }
+    Box(Modifier.fillMaxWidth().pointerInput(Unit) {
+        detectHorizontalDragGestures(
+            onDragStart = { dx = 0f },
+            onHorizontalDrag = { change, amount ->
+                if (amount > 0) {
+                    change.consume()
+                    dx = (dx + amount).coerceAtMost(130.dp.toPx())
+                }
+            },
+            onDragEnd = {
+                if (dx > 60.dp.toPx()) onSwipe()
+                dx = 0f
+            })
+    }) {
+        Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(dx.roundToInt(), 0) }) { content() }
+    }
 }
 
 @Composable internal fun Choices(labels: List<String>, current: String, select: (String) -> Unit) {

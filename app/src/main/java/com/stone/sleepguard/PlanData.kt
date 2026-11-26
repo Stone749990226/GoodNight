@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.content.Context
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -86,6 +87,8 @@ data class PlanSummary(
 interface PlanDao {
     @Query("SELECT * FROM plan_tasks WHERE dueDate = :date ORDER BY (completedAt IS NOT NULL), createdAt")
     fun observeTasks(date: Int): Flow<List<PlanTask>>
+    @Query("SELECT * FROM plan_tasks WHERE dueDate BETWEEN :start AND :end")
+    fun observeTasksRange(start: Int, end: Int): Flow<List<PlanTask>>
     @Query("SELECT * FROM plan_tasks WHERE dueDate = :date ORDER BY (completedAt IS NOT NULL), createdAt")
     suspend fun tasks(date: Int): List<PlanTask>
     @Query("SELECT * FROM habit_days WHERE habitId = :id ORDER BY date") fun history(id: Long): Flow<List<HabitDay>>
@@ -110,6 +113,7 @@ interface PlanDao {
     @Query("DELETE FROM habit_reminders WHERE habitId = :habitId") suspend fun deleteReminders(habitId: Long)
 
     @Query("SELECT * FROM habit_days WHERE date = :date") fun observeDays(date: Int): Flow<List<HabitDay>>
+    @Query("SELECT * FROM habit_days WHERE date BETWEEN :start AND :end") fun observeDaysRange(start: Int, end: Int): Flow<List<HabitDay>>
     @Query("SELECT * FROM habit_days WHERE date = :date") suspend fun days(date: Int): List<HabitDay>
     @Query("SELECT * FROM habit_days WHERE habitId = :habitId AND date = :date") suspend fun day(habitId: Long, date: Int): HabitDay?
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertDay(day: HabitDay): Long
@@ -123,6 +127,8 @@ interface PlanDao {
     @Update suspend fun updateCheckIn(checkIn: HabitCheckIn)
     @Query("DELETE FROM habit_checkins WHERE habitId = :habitId AND date = :date AND minute = :minute")
     suspend fun deleteCheckIn(habitId: Long, date: Int, minute: Int)
+    @Query("DELETE FROM habit_checkins WHERE habitId = :habitId AND date = :date")
+    suspend fun clearCheckIns(habitId: Long, date: Int)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun ensureSummary(summary: PlanSummary): Long
     @Query("SELECT * FROM plan_summaries WHERE date = :date") suspend fun summary(date: Int): PlanSummary?
@@ -206,6 +212,28 @@ class PlanRepository(private val context: Context) {
     fun reminders(): Flow<List<HabitReminder>> = dao.observeReminders()
     fun days(date: LocalDate): Flow<List<HabitDay>> = dao.observeDays(date.toEpochDay().toInt())
 
+    /** 日期格预览：true=完成，false=未完成；每天最多三个。 */
+    fun marks(start: LocalDate, end: LocalDate): Flow<Map<Int, List<Boolean>>> = combine(
+        dao.observeTasksRange(start.toEpochDay().toInt(), end.toEpochDay().toInt()),
+        dao.observeHabits(),
+        dao.observeDaysRange(start.toEpochDay().toInt(), end.toEpochDay().toInt()),
+    ) { tasks, habits, days ->
+        val byDay = days.associateBy { it.habitId to it.date }
+        val result = mutableMapOf<Int, List<Boolean>>()
+        var date = start
+        while (!date.isAfter(end)) {
+            val epoch = date.toEpochDay().toInt()
+            val marks = tasks.filter { it.dueDate == epoch }.map { it.completedAt != null }.toMutableList()
+            habits.filter { it.isDue(date) }.forEach { habit ->
+                val day = byDay[habit.id to epoch] ?: days.firstOrNull { it.habitId == habit.id && it.date == epoch }
+                marks.add((day?.count ?: 0) >= (day?.dayTarget ?: habit.targetCount).coerceAtLeast(1))
+            }
+            if (marks.isNotEmpty()) result[epoch] = marks.sortedBy { it }.take(3)
+            date = date.plusDays(1)
+        }
+        result
+    }
+
     suspend fun saveTask(task: PlanTask) = mutex.withLock {
         require(task.title.isNotBlank())
         require(task.dueMinute == null || task.dueMinute in 0..1439)
@@ -245,6 +273,35 @@ class PlanRepository(private val context: Context) {
     }
 
     suspend fun deleteHabit(id: Long) = mutex.withLock { dao.deleteHabit(id) }
+
+    /** 右滑：未满 +1，已满清零。 */
+    suspend fun swipeHabit(habitId: Long, date: LocalDate) = mutex.withLock {
+        if (date > LocalDate.now()) return@withLock
+        val day = date.toEpochDay().toInt()
+        val habit = dao.habit(habitId) ?: return@withLock
+        if (!habit.isDue(date)) return@withLock
+        val current = dao.day(habitId, day) ?: HabitDay(habitId, day)
+        val target = current.dayTarget ?: habit.targetCount.coerceAtLeast(1)
+        if (current.count >= target) {
+            db.withTransaction {
+                dao.clearCheckIns(habitId, day)
+                dao.updateDay(current.copy(count = 0, completedAt = null))
+            }
+            return@withLock
+        }
+        val now = System.currentTimeMillis()
+        val stamped = dao.checkIns(day).filter { it.habitId == habitId && it.completedAt != null }
+        val slot = dao.reminders(habitId).map { it.minute }.firstOrNull { t -> stamped.none { it.minute == t } }
+        if (slot != null) {
+            val existing = dao.checkIn(habitId, day, slot)
+            if (existing == null) dao.insertCheckIn(HabitCheckIn(habitId = habitId, date = day, minute = slot, completedAt = now))
+            else dao.updateCheckIn(existing.copy(completedAt = now))
+        }
+        val next = current.copy(count = current.count + 1, dayTarget = target,
+            completedAt = if (current.count + 1 >= target) now else null)
+        if (dao.insertDay(next) == -1L) dao.updateDay(next)
+        maybeSendAllDone(date)
+    }
 
     suspend fun changeHabit(habitId: Long, date: LocalDate, minute: Int?, undo: Boolean = false) = mutex.withLock {
         if (date > LocalDate.now()) return@withLock

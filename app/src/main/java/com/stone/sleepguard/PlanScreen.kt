@@ -20,6 +20,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.Context
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -36,6 +42,7 @@ internal fun PlanScreen(
     habits: List<Habit>,
     reminders: List<HabitReminder>,
     days: List<HabitDay>,
+    marks: Map<Int, List<Boolean>>,
     scrollState: ScrollState,
     onSelectDate: (LocalDate) -> Unit,
     onSaveTask: (PlanTask) -> Unit,
@@ -48,6 +55,7 @@ internal fun PlanScreen(
     onSaveHabit: (Habit, List<Int>) -> Unit,
     onDeleteHabit: (Long) -> Unit,
     onHabitStep: (Long, LocalDate, Int?, Boolean) -> Unit,
+    onHabitSwipe: (Long, LocalDate) -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("plan_view", 0) }
@@ -127,24 +135,25 @@ internal fun PlanScreen(
         }
         if (expanded) {
             HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth().height(274.dp)) { page ->
-                MonthGrid(baseMonth.plusMonths(page - 120L), selectedDate, onSelectDate)
+                MonthGrid(baseMonth.plusMonths(page - 120L), selectedDate, marks, onSelectDate)
             }
         } else {
-            HorizontalPager(state = weekPager, modifier = Modifier.fillMaxWidth().height(68.dp)) { page ->
+            HorizontalPager(state = weekPager, modifier = Modifier.fillMaxWidth().height(76.dp)) { page ->
                 val weekStart = baseWeek.plusWeeks(page - 120L)
                 Row(Modifier.fillMaxWidth()) {
                     (0..6).forEach { offset ->
                         val date = weekStart.plusDays(offset.toLong())
                         val selected = date == selectedDate
                         Column(Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).clickable { onSelectDate(date) }
-                            .padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            .padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.CHINA), color = Muted, fontSize = 11.sp)
-                            Spacer(Modifier.height(4.dp))
-                            Box(Modifier.size(36.dp).clip(RoundedCornerShape(50)).background(if (selected) Mint else Color.Transparent),
+                            Spacer(Modifier.height(3.dp))
+                            Box(Modifier.size(34.dp).clip(RoundedCornerShape(50)).background(if (selected) Mint else Color.Transparent),
                                 contentAlignment = Alignment.Center) {
                                 Text("${date.dayOfMonth}", color = if (selected) Ink else Cream, fontSize = 15.sp,
                                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
                             }
+                            DateDots(marks[date.toEpochDay().toInt()])
                         }
                     }
                 }
@@ -170,6 +179,8 @@ internal fun PlanScreen(
     DayAgenda(tasks, due, reminders, days, timeline, selectedDate <= today, checks,
         onEditTask = { editingTask = it }, onToggleTask = onToggleTask,
         onHabit = { detail = it }, onStep = { id, minute, undo -> onHabitStep(id, selectedDate, minute, undo) },
+        onSwipeTask = onToggleTask, onSwipeHabit = { id -> onHabitSwipe(id, selectedDate) },
+        onCompleted = { undo -> showDoneToast(context, undo) },
         onStats = { showStats = true })
     Spacer(Modifier.height(64.dp))
     if (addTask || editingTask != null) TaskSheet(editingTask, selectedDate,
@@ -192,7 +203,7 @@ internal fun PlanScreen(
     }
 }
 
-@Composable private fun MonthGrid(month: YearMonth, selectedDate: LocalDate, onSelectDate: (LocalDate) -> Unit) {
+@Composable private fun MonthGrid(month: YearMonth, selectedDate: LocalDate, marks: Map<Int, List<Boolean>>, onSelectDate: (LocalDate) -> Unit) {
     val first = month.atDay(1)
     val start = first.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     Column(Modifier.fillMaxWidth()) {
@@ -208,13 +219,16 @@ internal fun PlanScreen(
                     val date = start.plusDays((row * 7 + col).toLong())
                     val inMonth = YearMonth.from(date) == month
                     val selected = date == selectedDate
-                    Box(Modifier.weight(1f).height(38.dp), contentAlignment = Alignment.Center) {
-                        Box(Modifier.size(32.dp).clip(RoundedCornerShape(50))
-                            .background(if (selected) Mint else Color.Transparent)
-                            .clickable { onSelectDate(date) }, contentAlignment = Alignment.Center) {
-                            Text("${date.dayOfMonth}", fontSize = 14.sp,
-                                color = when { selected -> Ink; inMonth -> Cream; else -> Color(0xFF506974) },
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+                    Box(Modifier.weight(1f).height(44.dp), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(Modifier.size(30.dp).clip(RoundedCornerShape(50))
+                                .background(if (selected) Mint else Color.Transparent)
+                                .clickable { onSelectDate(date) }, contentAlignment = Alignment.Center) {
+                                Text("${date.dayOfMonth}", fontSize = 14.sp,
+                                    color = when { selected -> Ink; inMonth -> Cream; else -> Color(0xFF506974) },
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+                            }
+                            DateDots(marks[date.toEpochDay().toInt()])
                         }
                     }
                 }
@@ -319,6 +333,14 @@ internal fun PlanScreen(
 
 }
 
+@Composable private fun DateDots(marks: List<Boolean>?) {    Row(Modifier.height(6.dp).padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        (marks ?: emptyList()).take(3).forEach { done ->
+            Box(Modifier.size(4.dp).clip(RoundedCornerShape(50))
+                .background(if (done) Mint else Color(0xFFE88C8C)))
+        }
+    }
+}
+
 @Composable private fun IconChoice(glyph: String, selected: Boolean, onClick: () -> Unit) {
     Box(Modifier.size(36.dp).clip(RoundedCornerShape(50))
         .background(if (selected) Mint.copy(alpha = .28f) else Color.Transparent)
@@ -332,4 +354,36 @@ private fun frequencyText(habit: Habit): String = when (habit.frequency) {
         .joinToString("、") { LocalDate.of(2026, 3, 2).plusDays(it.toLong()).dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.CHINA) }
     FREQ_WORKDAYS -> "工作日"
     else -> "每天"
+}
+
+private fun showDoneToast(context: Context, onUndo: () -> Unit) {
+    val density = context.resources.displayMetrics.density
+    fun dp(n: Int) = (n * density).toInt()
+    val row = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(16), dp(10), dp(10), dp(10))
+        background = GradientDrawable().apply {
+            setColor(android.graphics.Color.rgb(22, 36, 46))
+            cornerRadius = dp(18).toFloat()
+            setStroke(dp(1), android.graphics.Color.rgb(46, 71, 82))
+        }
+    }
+    val toast = Toast(context).apply { duration = Toast.LENGTH_SHORT }
+    val message = TextView(context).apply {
+        text = "已完成，bb真厉害！💗"
+        setTextColor(android.graphics.Color.rgb(232, 239, 233))
+        textSize = 14f
+        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+    }
+    val undo = TextView(context).apply {
+        text = "撤销"
+        setTextColor(android.graphics.Color.rgb(168, 220, 203))
+        textSize = 14f
+        setPadding(dp(14), dp(4), dp(8), dp(4))
+        setOnClickListener { onUndo(); toast.cancel() }
+    }
+    row.addView(message); row.addView(undo)
+    toast.view = row
+    toast.show()
 }

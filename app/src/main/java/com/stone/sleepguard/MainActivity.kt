@@ -123,6 +123,7 @@ class MainActivity : ComponentActivity() {
                 val planHabits by planRepo.habits().collectAsStateWithLifecycle(emptyList())
                 val planReminders by planRepo.reminders().collectAsStateWithLifecycle(emptyList())
                 val planCheckIns by remember(selectedPlanDate) { planRepo.days(selectedPlanDate) }.collectAsStateWithLifecycle(emptyList())
+                val planMarks by remember(today) { planRepo.marks(today.minusDays(180), today.plusDays(180)) }.collectAsStateWithLifecycle(emptyMap())
                 Scaffold(floatingActionButton = { if (tab == 1) FloatingActionButton(onClick = { quickAdd = true }, containerColor = Mint, contentColor = Ink, shape = RoundedCornerShape(50)) { Text("+", fontSize = 30.sp, fontWeight = FontWeight.Light) } }, containerColor = Ink, contentColor = Cream, snackbarHost = { SnackbarHost(snackbar) }, bottomBar = {
                     Row(Modifier.fillMaxWidth().background(Ink).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         listOf("今晚", "计划", "记录", "设置").forEachIndexed { i, label ->
@@ -149,7 +150,7 @@ class MainActivity : ComponentActivity() {
                                     onReason = { id, text -> runAction { app.repository.reason(id, text) } },
                                     onFeeling = { feelingId = it }, onPhoto = { photo(it) },
                                     onShare = { id -> share(records.filter { it.night.id == id }) }, onPermissions = { tab = 3 }, permissionTick = tick, context = this@MainActivity)
-                                1 -> PlanScreen(today, selectedPlanDate, planTasks, planHabits, planReminders, planCheckIns, pageScroll,
+                                1 -> PlanScreen(today, selectedPlanDate, planTasks, planHabits, planReminders, planCheckIns, planMarks, pageScroll,
                                     onSelectDate = { planDate = it.toEpochDay() },
                                     onSaveTask = { task -> runAction { planRepo.saveTask(task) } },
                                     repo = planRepo, addTask = quickAdd, closeAdd = { quickAdd = false }, bedMinute = preferences.targetBed,
@@ -157,7 +158,8 @@ class MainActivity : ComponentActivity() {
                                     onDeleteTask = { id -> runAction { planRepo.deleteTask(id) } },
                                     onSaveHabit = { habit, times -> runAction { planRepo.saveHabit(habit, times); PlanScheduler.rebuild(this@MainActivity) } },
                                     onDeleteHabit = { id -> runAction { planRepo.deleteHabit(id); PlanScheduler.rebuild(this@MainActivity) } },
-                                    onHabitStep = { id, date, minute, undo -> runAction { planRepo.changeHabit(id, date, minute, undo) } })
+                                    onHabitStep = { id, date, minute, undo -> runAction { planRepo.changeHabit(id, date, minute, undo) } },
+                                    onHabitSwipe = { id, date -> runAction { planRepo.swipeHabit(id, date) } })
                                 2 -> RecordsScreen(records, { feelingId = it }, { photo(it) }, { share(it) }, { id, text -> runAction { app.repository.reason(id, text) } },
                                     onEdit = { id, edit -> runAction { app.repository.edit(id, edit) } },
                                     onDelete = { id -> runAction { app.repository.deleteNight(id)?.let { deleted = it } } },
