@@ -14,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -66,7 +67,7 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
         val count = records[habit?.id]?.count ?: 0
         val target = records[habit?.id]?.dayTarget ?: habit?.targetCount ?: 1
         val checkedSlot = habit != null && entry.minute != null && checks.any { it.habitId == habit.id && it.minute == entry.minute && it.completedAt != null }
-        val done = if (task != null) task.completedAt != null else count >= target || checkedSlot
+        val done = if (task != null) task.completedAt != null else count >= target || records[habit?.id]?.completedAt != null || checkedSlot
         val alarm = if (task != null) task.reminderMinute != null else !times[habit?.id].isNullOrEmpty()
         val marker = if (!alarm) "" else if (task?.alarm == true || habit?.reminderMode == "ALARM") "⏰" else "🔔"
         val schedule = if (task != null) task.dueMinute?.let { minutesText(it) + (task.endMinute?.let { end -> "–${minutesText(end)}" } ?: "") } ?: "全天"
@@ -74,10 +75,11 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
         SwipeRight(revealColor = if (done) Color(0xFFE05B5B) else Color(0xFF24C79A),
             symbol = if (done) "↺" else "✓", onSwipe = {
             if (task != null) {
-                if (!done) onCompleted("已完成：${task.title}！bb真厉害！💗") { onToggleTask(task.id) }
+                if (done) onCompleted("已取消完成：${task.title}") { null }
+                else onCompleted("已完成：${task.title}！bb真厉害！💗") { onToggleTask(task.id) }
                 onSwipeTask(task.id)
             } else if (habit != null) {
-                if (count < target) {
+                if (!done) {
                     val text = if (count + 1 >= target) "已完成：${habit.title}！bb真厉害！💗"
                     else "${habit.title} +1，bb真厉害！💗"
                     onCompleted(text) { onStep(habit.id, null, true) }
@@ -85,7 +87,7 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
                 onSwipeHabit(habit.id)
             }
         }) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).alpha(if (done) .45f else 1f), verticalAlignment = Alignment.CenterVertically) {
                 if (task != null) Checkbox(done, {
                     if (!done) onCompleted("已完成：${task.title}！bb真厉害！💗") { onToggleTask(task.id) }
                     onToggleTask(task.id)

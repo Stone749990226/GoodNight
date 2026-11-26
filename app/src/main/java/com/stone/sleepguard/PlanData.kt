@@ -282,7 +282,7 @@ class PlanRepository(private val context: Context) {
         if (!habit.isDue(date)) return@withLock
         val current = dao.day(habitId, day) ?: HabitDay(habitId, day)
         val target = current.dayTarget ?: habit.targetCount.coerceAtLeast(1)
-        if (current.count >= target) {
+        if (current.completedAt != null || current.count >= target) {
             db.withTransaction {
                 dao.clearCheckIns(habitId, day)
                 dao.updateDay(current.copy(count = 0, completedAt = null))
