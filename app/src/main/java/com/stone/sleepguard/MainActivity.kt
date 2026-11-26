@@ -123,7 +123,7 @@ class MainActivity : ComponentActivity() {
                 val planHabits by planRepo.habits().collectAsStateWithLifecycle(emptyList())
                 val planReminders by planRepo.reminders().collectAsStateWithLifecycle(emptyList())
                 val planCheckIns by remember(selectedPlanDate) { planRepo.days(selectedPlanDate) }.collectAsStateWithLifecycle(emptyList())
-                Scaffold(floatingActionButton = { if (tab == 1) ExtendedFloatingActionButton(onClick = { quickAdd = true }, containerColor = Mint, contentColor = Ink) { Text("＋ 新建") } }, containerColor = Ink, contentColor = Cream, snackbarHost = { SnackbarHost(snackbar) }, bottomBar = {
+                Scaffold(floatingActionButton = { if (tab == 1) FloatingActionButton(onClick = { quickAdd = true }, containerColor = Mint, contentColor = Ink, shape = RoundedCornerShape(50)) { Text("+", fontSize = 30.sp, fontWeight = FontWeight.Light) } }, containerColor = Ink, contentColor = Cream, snackbarHost = { SnackbarHost(snackbar) }, bottomBar = {
                     Row(Modifier.fillMaxWidth().background(Ink).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         listOf("今晚", "计划", "记录", "设置").forEachIndexed { i, label ->
                             Column(Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).clickable { tab = i }.padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
