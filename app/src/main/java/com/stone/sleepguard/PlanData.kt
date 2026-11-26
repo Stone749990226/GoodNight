@@ -22,6 +22,8 @@ data class PlanTask(
     val dueDate: Int,
     val dueMinute: Int? = null,
     val reminderMinute: Int? = null,
+    val endMinute: Int? = null,
+    val alarm: Boolean = false,
     val completedAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
 )
@@ -35,6 +37,7 @@ data class Habit(
     val startDate: Int = LocalDate.now().toEpochDay().toInt(),
     val active: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
+    val icon: String = "",
     val targetCount: Int = 1,
     val reminderMode: String = "ALARM",
 )
@@ -46,6 +49,7 @@ data class HabitDay(
     val habitId: Long,
     val date: Int,
     val count: Int = 0,
+    val dayTarget: Int? = null,
     val completedAt: Long? = null,
     val overdueEmailSent: Boolean = false,
 )
@@ -84,6 +88,10 @@ interface PlanDao {
     fun observeTasks(date: Int): Flow<List<PlanTask>>
     @Query("SELECT * FROM plan_tasks WHERE dueDate = :date ORDER BY (completedAt IS NOT NULL), createdAt")
     suspend fun tasks(date: Int): List<PlanTask>
+    @Query("SELECT * FROM habit_days WHERE habitId = :id ORDER BY date") fun history(id: Long): Flow<List<HabitDay>>
+    @Query("SELECT * FROM plan_tasks WHERE id = :id") suspend fun task(id: Long): PlanTask?
+    @Query("SELECT * FROM plan_tasks WHERE completedAt IS NULL AND reminderMinute IS NOT NULL AND dueDate >= :today")
+    suspend fun pendingTasks(today: Int): List<PlanTask>
     @Insert suspend fun insertTask(task: PlanTask): Long
     @Update suspend fun updateTask(task: PlanTask)
     @Query("DELETE FROM plan_tasks WHERE id = :id") suspend fun deleteTask(id: Long)
@@ -122,8 +130,18 @@ interface PlanDao {
     @Query("UPDATE plan_summaries SET midnightEmailSent = 1 WHERE date = :date") suspend fun markMidnight(date: Int)
 }
 
-@Database(entities = [PlanTask::class, Habit::class, HabitReminder::class, HabitCheckIn::class, HabitDay::class, PlanSummary::class], version = 2, exportSchema = false)
+@Database(entities = [PlanTask::class, Habit::class, HabitReminder::class, HabitCheckIn::class, HabitDay::class, PlanSummary::class], version = 3, exportSchema = false)
 abstract class PlanDatabase : RoomDatabase() { abstract fun dao(): PlanDao }
+
+private val PLAN_MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE habit_days ADD COLUMN dayTarget INTEGER")
+        db.execSQL("UPDATE habit_days SET dayTarget = CASE WHEN completedAt IS NOT NULL THEN MAX(count, 1) ELSE (SELECT targetCount FROM habits WHERE id = habitId) END")
+        db.execSQL("ALTER TABLE plan_tasks ADD COLUMN endMinute INTEGER")
+        db.execSQL("ALTER TABLE plan_tasks ADD COLUMN alarm INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE habits ADD COLUMN icon TEXT NOT NULL DEFAULT ''")
+    }
+}
 
 private val PLAN_MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
     override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
@@ -179,7 +197,7 @@ fun slotsFor(habits: List<Habit>, reminders: List<HabitReminder>, date: LocalDat
 
 class PlanRepository(private val context: Context) {
     private val db = Room.databaseBuilder(context, PlanDatabase::class.java, "plan.db")
-        .addMigrations(PLAN_MIGRATION_1_2).build()
+        .addMigrations(PLAN_MIGRATION_1_2, PLAN_MIGRATION_2_3).build()
     val dao = db.dao()
     private val mutex = Mutex()
 
@@ -188,30 +206,30 @@ class PlanRepository(private val context: Context) {
     fun reminders(): Flow<List<HabitReminder>> = dao.observeReminders()
     fun days(date: LocalDate): Flow<List<HabitDay>> = dao.observeDays(date.toEpochDay().toInt())
 
-    suspend fun addTask(title: String, date: LocalDate, dueMinute: Int?, reminderMinute: Int?) = mutex.withLock {
-        val clean = title.trim()
-        require(clean.isNotEmpty()) { "请写下待办内容" }
-        dao.insertTask(PlanTask(title = clean, dueDate = date.toEpochDay().toInt(), dueMinute = dueMinute, reminderMinute = reminderMinute))
+    suspend fun saveTask(task: PlanTask) = mutex.withLock {
+        require(task.title.isNotBlank())
+        require(task.dueMinute == null || task.dueMinute in 0..1439)
+        require(task.endMinute == null || (task.dueMinute != null && task.endMinute in task.dueMinute + 1..1439))
+        val saved = if (task.id == 0L) task.copy(id = dao.insertTask(task)) else {
+            dao.updateTask(task)
+            task
+        }
+        PlanScheduler.syncTask(context, saved)
     }
 
     suspend fun toggleTask(id: Long, date: LocalDate) = mutex.withLock {
         val task = dao.tasks(date.toEpochDay().toInt()).firstOrNull { it.id == id } ?: return@withLock
-        dao.updateTask(task.copy(completedAt = if (task.completedAt == null) System.currentTimeMillis() else null))
+        val updated = task.copy(completedAt = if (task.completedAt == null) System.currentTimeMillis() else null)
+        dao.updateTask(updated)
+        PlanScheduler.syncTask(context, updated)
     }
 
-    suspend fun renameTask(id: Long, date: LocalDate, title: String) = mutex.withLock {
-        val clean = title.trim()
-        require(clean.isNotEmpty()) { "请写下计划内容" }
-        val task = dao.tasks(date.toEpochDay().toInt()).firstOrNull { it.id == id } ?: return@withLock
-        dao.updateTask(task.copy(title = clean))
-    }
-
-    suspend fun deleteTask(id: Long) = mutex.withLock { dao.deleteTask(id) }
+    suspend fun deleteTask(id: Long) = mutex.withLock { dao.deleteTask(id); PlanScheduler.cancelTask(context, id) }
 
     suspend fun saveHabit(habit: Habit, reminderMinutes: List<Int>): Long = mutex.withLock {
         val clean = habit.title.trim()
         require(clean.isNotEmpty()) { "请写下习惯名称" }
-        require(reminderMinutes.isNotEmpty()) { "至少设置一个提醒时间" }
+
         val times = reminderMinutes.distinct().sorted().take(5)
         val id = if (habit.id == 0L) dao.insertHabit(habit.copy(title = clean))
         else { dao.updateHabit(habit.copy(title = clean)); dao.deleteReminders(habit.id); habit.id }
@@ -221,37 +239,35 @@ class PlanRepository(private val context: Context) {
 
     suspend fun deleteHabit(id: Long) = mutex.withLock { dao.deleteHabit(id) }
 
-    /** 单次习惯切换完成；计数习惯 +1（到目标后保持完成）。 */
-    suspend fun toggleHabit(habitId: Long, date: LocalDate) = mutex.withLock {
-        val habit = dao.habit(habitId) ?: return@withLock
-        if (!habit.isDue(date)) return@withLock
-        val dayNumber = date.toEpochDay().toInt()
-        val target = habit.targetCount.coerceAtLeast(1)
-        val current = dao.day(habitId, dayNumber) ?: HabitDay(habitId = habitId, date = dayNumber)
-        val next = if (target == 1) {
-            if (current.count >= 1) current.copy(count = 0, completedAt = null)
-            else current.copy(count = 1, completedAt = System.currentTimeMillis())
-        } else {
-            if (current.count >= target) current
-            else current.copy(count = current.count + 1,
-                completedAt = if (current.count + 1 >= target) System.currentTimeMillis() else null)
+    suspend fun changeHabit(habitId: Long, date: LocalDate, minute: Int?, undo: Boolean = false) = mutex.withLock {
+        if (date > LocalDate.now()) return@withLock
+        val day = date.toEpochDay().toInt()
+        val updated = db.withTransaction {
+            val habit = dao.habit(habitId) ?: return@withTransaction false
+            if (!habit.isDue(date)) return@withTransaction false
+            val current = dao.day(habitId, day) ?: HabitDay(habitId, day)
+            val target = current.dayTarget ?: habit.targetCount.coerceAtLeast(1)
+            val stamped = dao.checkIns(day).filter { it.habitId == habitId && it.completedAt != null }
+            val times = dao.reminders(habitId).map { it.minute }
+            if (!undo && minute != null && (minute !in times || stamped.any { it.minute == minute })) return@withTransaction false
+            if (undo && current.count == 0 || !undo && current.count >= target) return@withTransaction false
+            val count = current.count + if (undo) -1 else 1
+            val now = System.currentTimeMillis()
+            if (undo) {
+                stamped.maxByOrNull { it.completedAt!! }?.let { dao.deleteCheckIn(habitId, day, it.minute) }
+            } else {
+                val slot = minute ?: times.firstOrNull { t -> stamped.none { it.minute == t } }
+                if (slot != null) {
+                    val existing = dao.checkIn(habitId, day, slot)
+                    if (existing == null) dao.insertCheckIn(HabitCheckIn(habitId = habitId, date = day, minute = slot, completedAt = now))
+                    else dao.updateCheckIn(existing.copy(completedAt = now))
+                }
+            }
+            val next = current.copy(count = count, dayTarget = target, completedAt = if (count >= target) now else null)
+            if (dao.insertDay(next) == -1L) dao.updateDay(next)
+            true
         }
-        if (dao.day(habitId, dayNumber) == null) dao.insertDay(next) else dao.updateDay(next)
-        maybeSendAllDone(date)
-    }
-
-    /** 通知栏的「完成」只加一次，不撤销已有完成。 */
-    suspend fun completeHabit(habitId: Long, date: LocalDate) = mutex.withLock {
-        val habit = dao.habit(habitId) ?: return@withLock
-        if (!habit.isDue(date)) return@withLock
-        val dayNumber = date.toEpochDay().toInt()
-        val target = habit.targetCount.coerceAtLeast(1)
-        val current = dao.day(habitId, dayNumber) ?: HabitDay(habitId = habitId, date = dayNumber)
-        if (current.count >= target) return@withLock
-        val next = current.copy(count = current.count + 1,
-            completedAt = if (current.count + 1 >= target) System.currentTimeMillis() else null)
-        if (dao.day(habitId, dayNumber) == null) dao.insertDay(next) else dao.updateDay(next)
-        maybeSendAllDone(date)
+        if (updated && !undo && date == LocalDate.now()) maybeSendAllDone(date)
     }
 
     suspend fun dueHabits(date: LocalDate): List<Habit> = dao.habits().filter { it.isDue(date) }
@@ -260,7 +276,7 @@ class PlanRepository(private val context: Context) {
         dao.days(date.toEpochDay().toInt()).associateBy { it.habitId }
 
     private fun Habit.isComplete(day: HabitDay?): Boolean =
-        (day?.count ?: 0) >= targetCount.coerceAtLeast(1)
+        day?.completedAt != null
 
     private suspend fun doneCount(date: LocalDate): Int {
         val days = dayMap(date)
@@ -284,6 +300,7 @@ class PlanRepository(private val context: Context) {
         val habit = dao.habit(habitId) ?: return
         if (!habit.isDue(date)) return
         if (dao.reminders(habitId).none { it.minute == minute }) return
+        if (dao.checkIn(habitId, dayNumber, minute)?.completedAt != null) return
         val current = dao.day(habitId, dayNumber)
         if (habit.isComplete(current) || current?.overdueEmailSent == true) return
         val next = (current ?: HabitDay(habitId = habitId, date = dayNumber)).copy(overdueEmailSent = true)

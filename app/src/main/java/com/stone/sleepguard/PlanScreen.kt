@@ -1,5 +1,6 @@
 package com.stone.sleepguard
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -37,18 +38,25 @@ internal fun PlanScreen(
     days: List<HabitDay>,
     scrollState: ScrollState,
     onSelectDate: (LocalDate) -> Unit,
-    onAddTask: (String) -> Unit,
+    onSaveTask: (PlanTask) -> Unit,
+    repo: PlanRepository,
+    bedMinute: Int,
+    addTask: Boolean,
+    closeAdd: () -> Unit,
     onToggleTask: (Long) -> Unit,
-    onEditTask: (Long, String) -> Unit,
     onDeleteTask: (Long) -> Unit,
     onSaveHabit: (Habit, List<Int>) -> Unit,
     onDeleteHabit: (Long) -> Unit,
-    onHabitStep: (Long, LocalDate) -> Unit,
+    onHabitStep: (Long, LocalDate, Int?, Boolean) -> Unit,
 ) {
-    var addTask by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { context.getSharedPreferences("plan_view", 0) }
+    var timeline by remember { mutableStateOf(prefs.getBoolean("timeline", false)) }
+    var detail by remember { mutableStateOf<Habit?>(null) }
+    var showStats by remember { mutableStateOf(false) }
     var editingTask by remember { mutableStateOf<PlanTask?>(null) }
     var editingHabit by remember { mutableStateOf<Habit?>(null) }
-    var creatingHabit by remember { mutableStateOf(false) }
+    var creatingHabit by rememberSaveable { mutableStateOf(false) }
     var expanded by rememberSaveable { mutableStateOf(false) }
     var dragY by remember { mutableFloatStateOf(0f) }
     val baseMonth = remember { YearMonth.from(today) }
@@ -87,6 +95,9 @@ internal fun PlanScreen(
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text("${shownMonth.year}年${shownMonth.monthValue}月", fontSize = 22.sp, color = Cream,
             fontWeight = FontWeight.Light, modifier = Modifier.weight(1f))
+        TextButton(onClick = { timeline = !timeline; prefs.edit().putBoolean("timeline", timeline).apply() }) {
+            Text(if (timeline) "☷ 清单" else "◷ 时间线")
+        }
         if (selectedDate != today) TextButton(onClick = { onSelectDate(today) }) { Text("今天") }
         if (expanded) TextButton(onClick = { expanded = false }) { Text("收起") }
     }
@@ -140,52 +151,35 @@ internal fun PlanScreen(
             }
         }
     }
-    SoftCard {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("计划", fontSize = 18.sp, color = Cream, modifier = Modifier.weight(1f))
-            TextButton(onClick = { addTask = true }) { Text("+", fontSize = 24.sp, color = Mint) }
-        }
-        if (tasks.isEmpty()) Text("没有计划", color = Muted, fontSize = 12.sp)
-        tasks.forEach { task ->
-            Row(Modifier.fillMaxWidth().clickable { editingTask = task }.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = task.completedAt != null, onCheckedChange = { onToggleTask(task.id) },
-                    colors = CheckboxDefaults.colors(checkedColor = Mint, uncheckedColor = Muted, checkmarkColor = Ink))
-                Text(task.title, color = if (task.completedAt == null) Cream else Muted, fontSize = 15.sp,
-                    textDecoration = if (task.completedAt == null) null else androidx.compose.ui.text.style.TextDecoration.LineThrough,
-                    modifier = Modifier.weight(1f))
-            }
-        }
-    }
-    SoftCard {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("习惯", fontSize = 18.sp, color = Cream, modifier = Modifier.weight(1f))
-            TextButton(onClick = { creatingHabit = true }) { Text("+", fontSize = 24.sp, color = Mint) }
-        }
-        val due = habits.filter { it.isDue(selectedDate) }
-        if (due.isEmpty()) Text("没有习惯", color = Muted, fontSize = 12.sp)
-        due.forEach { habit ->
-            val day = days.firstOrNull { it.habitId == habit.id }
-            val count = day?.count ?: 0
-            val target = habit.targetCount.coerceAtLeast(1)
-            Row(Modifier.fillMaxWidth().clickable { editingHabit = habit }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (target == 1) {
-                    Checkbox(checked = count >= 1, onCheckedChange = { onHabitStep(habit.id, selectedDate) },
-                        colors = CheckboxDefaults.colors(checkedColor = Mint, uncheckedColor = Muted, checkmarkColor = Ink))
-                } else {
-                    Text("$count/$target", color = if (count >= target) Mint else Cream, fontSize = 13.sp,
-                        modifier = Modifier.width(52.dp))
-                    TextButton(enabled = count < target, onClick = { onHabitStep(habit.id, selectedDate) }) { Text("+1") }
+    val due = habits.filter { it.isDue(selectedDate) }
+    val checks by remember(selectedDate) { repo.dao.observeCheckIns(selectedDate.toEpochDay().toInt()) }.collectAsStateWithLifecycle(emptyList())
+    val now = java.time.LocalTime.now().toSecondOfDay() / 60
+    if (selectedDate == today && (bedMinute - now + 1440) % 1440 <= 60 && tasks.any { it.completedAt == null }) {
+        var reviewing by rememberSaveable { mutableStateOf(false) }
+        SoftCard {
+            TextButton(onClick = { reviewing = !reviewing }) { Text("睡前收尾 · 还有 ${tasks.count { it.completedAt == null }} 项计划") }
+            if (reviewing) tasks.filter { it.completedAt == null }.forEach { task ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(task.title, Modifier.weight(1f), color = Cream)
+                    TextButton(onClick = { editingTask = task }) { Text("调整") }
+                    TextButton(onClick = { onSaveTask(task.copy(dueDate = task.dueDate + 1)) }) { Text("移到明天") }
                 }
-                Text(habit.title, color = Cream, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             }
         }
     }
-    if (addTask) AddTaskDialog(onDismiss = { addTask = false }, onSave = { title -> addTask = false; onAddTask(title) })
-    editingTask?.let { task ->
-        TaskEditorDialog(task, onDismiss = { editingTask = null }, onSave = { title ->
-            editingTask = null; onEditTask(task.id, title)
-        }, onDelete = { editingTask = null; onDeleteTask(task.id) })
-    }
+    DayAgenda(tasks, due, reminders, days, timeline, selectedDate <= today, checks,
+        onEditTask = { editingTask = it }, onToggleTask = onToggleTask,
+        onHabit = { detail = it }, onStep = { id, minute, undo -> onHabitStep(id, selectedDate, minute, undo) },
+        onStats = { showStats = true })
+    Spacer(Modifier.height(64.dp))
+    if (addTask || editingTask != null) TaskSheet(editingTask, selectedDate,
+        onDismiss = { closeAdd(); editingTask = null },
+        onHabit = { closeAdd(); creatingHabit = true },
+        onDelete = { onDeleteTask(it); editingTask = null },
+        onSave = { onSaveTask(it); closeAdd(); editingTask = null })
+    if (showStats || detail != null) HabitInsights(habits, detail, repo, selectedDate,
+        onChange = { id, date, undo -> onHabitStep(id, date, null, undo) }, onPick = { detail = it }, onEdit = { editingHabit = it; detail = null; showStats = false },
+        onDismiss = { detail = null; showStats = false })
     if (creatingHabit) HabitEditorDialog(null, selectedDate, onDismiss = { creatingHabit = false }) { habit, mins ->
         creatingHabit = false; onSaveHabit(habit, mins)
     }
@@ -229,33 +223,6 @@ internal fun PlanScreen(
     }
 }
 
-@Composable private fun AddTaskDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    var title by rememberSaveable { mutableStateOf("") }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("添加计划") }, text = {
-        OutlinedTextField(value = title, onValueChange = { title = it }, placeholder = { Text("要做什么？") },
-            modifier = Modifier.fillMaxWidth(), singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Panel, unfocusedContainerColor = Panel,
-                focusedTextColor = Cream, unfocusedTextColor = Cream, focusedBorderColor = Mint, unfocusedBorderColor = Color(0xFF3B505C), cursorColor = Mint))
-    }, confirmButton = {
-        TextButton(onClick = { if (title.isNotBlank()) onSave(title.trim()) }, enabled = title.isNotBlank()) { Text("保存") }
-    }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-        containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
-}
-
-@Composable private fun TaskEditorDialog(task: PlanTask, onDismiss: () -> Unit, onSave: (String) -> Unit, onDelete: () -> Unit) {
-    var title by rememberSaveable(task.id) { mutableStateOf(task.title) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("编辑计划") }, text = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth(), singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Panel, unfocusedContainerColor = Panel,
-                    focusedTextColor = Cream, unfocusedTextColor = Cream, focusedBorderColor = Mint, unfocusedBorderColor = Color(0xFF3B505C), cursorColor = Mint))
-            TextButton(onClick = onDelete) { Text("删除计划", color = Color(0xFFF2ACA5)) }
-        }
-    }, confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = { onSave(title.trim()) }) { Text("保存") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-        containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
-}
-
 @Composable private fun HabitEditorDialog(
     existing: Habit?,
     date: LocalDate,
@@ -265,11 +232,13 @@ internal fun PlanScreen(
     onSave: (Habit, List<Int>) -> Unit,
 ) {
     var title by rememberSaveable(existing?.id) { mutableStateOf(existing?.title ?: "") }
+    var icon by rememberSaveable(existing?.id) { mutableStateOf(existing?.icon.orEmpty()) }
     var frequency by rememberSaveable(existing?.id) { mutableStateOf(existing?.frequency ?: FREQ_DAILY) }
     var mask by rememberSaveable(existing?.id) { mutableIntStateOf(existing?.weekdayMask ?: 0b1111111) }
     var target by rememberSaveable(existing?.id) { mutableIntStateOf(existing?.targetCount ?: 1) }
     var mode by rememberSaveable(existing?.id) { mutableStateOf(existing?.reminderMode ?: "ALARM") }
     var times by remember(existing?.id) { mutableStateOf(initialTimes.distinct().sorted()) }
+    var confirmDelete by remember { mutableStateOf(false) }
     var pickingTime by remember { mutableStateOf(false) }
     if (pickingTime) WheelTimeDialog(initial = 9 * 60, title = "提醒时间", confirmLabel = "添加",
         onDismiss = { pickingTime = false }, onConfirm = { minute ->
@@ -282,6 +251,9 @@ internal fun PlanScreen(
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Panel, unfocusedContainerColor = Panel,
                     focusedTextColor = Cream, unfocusedTextColor = Cream, focusedBorderColor = Mint, unfocusedBorderColor = Color(0xFF3B505C), cursorColor = Mint))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                habitIcons.forEach { glyph -> FilterChip(selected = icon == glyph, onClick = { icon = glyph }, label = { Text(glyph) }) }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(FREQ_DAILY to "每天", FREQ_WEEKDAYS to "每周", FREQ_WORKDAYS to "工作日").forEach { (value, label) ->
                     FilterChip(selected = frequency == value, onClick = { frequency = value }, label = { Text(label) })
@@ -307,6 +279,7 @@ internal fun PlanScreen(
                     FilterChip(selected = mode == value, onClick = { mode = value }, label = { Text(label) })
                 }
             }
+            if (times.isNotEmpty()) ReminderAccess(mode == "ALARM")
             Text("提醒时间", color = Muted, fontSize = 12.sp)
             times.forEach { minute ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -315,17 +288,21 @@ internal fun PlanScreen(
                 }
             }
             if (times.size < 5) TextButton(onClick = { pickingTime = true }) { Text("添加提醒时间") }
-            if (existing != null && onDelete != null) TextButton(onClick = onDelete) { Text("删除习惯", color = Color(0xFFF2ACA5)) }
+            if (existing != null && onDelete != null) TextButton(onClick = { confirmDelete = true }) { Text("删除习惯", color = Color(0xFFF2ACA5)) }
         }
     }, confirmButton = {
-        TextButton(enabled = title.isNotBlank() && times.isNotEmpty(), onClick = {
+        TextButton(enabled = title.isNotBlank() && (frequency != FREQ_WEEKDAYS || mask != 0), onClick = {
             val habit = (existing ?: Habit(title = title, startDate = date.toEpochDay().toInt()))
-                .copy(title = title.trim(), frequency = frequency, weekdayMask = mask, active = true,
+                .copy(title = title.trim(), icon = icon, frequency = frequency, weekdayMask = mask, active = true,
                     targetCount = target.coerceAtLeast(1), reminderMode = mode)
             onSave(habit, times)
         }) { Text("保存") }
     }, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
         containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
+    if (confirmDelete && onDelete != null) AlertDialog(onDismissRequest = { confirmDelete = false },
+        title = { Text("删除这个习惯和打卡记录？") }, confirmButton = { TextButton(onClick = onDelete) { Text("删除") } },
+        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("保留") } })
+
 }
 
 private fun frequencyText(habit: Habit): String = when (habit.frequency) {
