@@ -201,6 +201,8 @@ fun slotsFor(habits: List<Habit>, reminders: List<HabitReminder>, date: LocalDat
         reminders.filter { it.habitId == habit.id }.map { HabitSlot(habit, it.minute) }
     }
 
+data class HabitSwipeResult(val title: String, val reset: Boolean, val count: Int, val target: Int)
+
 class PlanRepository(private val context: Context) {
     private val db = Room.databaseBuilder(context, PlanDatabase::class.java, "plan.db")
         .addMigrations(PLAN_MIGRATION_1_2, PLAN_MIGRATION_2_3).build()
@@ -274,12 +276,12 @@ class PlanRepository(private val context: Context) {
 
     suspend fun deleteHabit(id: Long) = mutex.withLock { dao.deleteHabit(id) }
 
-    /** 右滑：未满 +1，已满清零。 */
-    suspend fun swipeHabit(habitId: Long, date: LocalDate) = mutex.withLock {
-        if (date > LocalDate.now()) return@withLock
+    /** 右滑：未满 +1，已满清零；返回结果供界面提示。 */
+    suspend fun swipeHabit(habitId: Long, date: LocalDate): HabitSwipeResult? = mutex.withLock {
+        if (date > LocalDate.now()) return@withLock null
         val day = date.toEpochDay().toInt()
-        val habit = dao.habit(habitId) ?: return@withLock
-        if (!habit.isDue(date)) return@withLock
+        val habit = dao.habit(habitId) ?: return@withLock null
+        if (!habit.isDue(date)) return@withLock null
         val current = dao.day(habitId, day) ?: HabitDay(habitId, day)
         val target = current.dayTarget ?: habit.targetCount.coerceAtLeast(1)
         if (current.completedAt != null || current.count >= target) {
@@ -287,7 +289,7 @@ class PlanRepository(private val context: Context) {
                 dao.clearCheckIns(habitId, day)
                 dao.updateDay(current.copy(count = 0, completedAt = null))
             }
-            return@withLock
+            return@withLock HabitSwipeResult(habit.title, reset = true, count = 0, target = target)
         }
         val now = System.currentTimeMillis()
         val stamped = dao.checkIns(day).filter { it.habitId == habitId && it.completedAt != null }
@@ -301,6 +303,7 @@ class PlanRepository(private val context: Context) {
             completedAt = if (current.count + 1 >= target) now else null)
         if (dao.insertDay(next) == -1L) dao.updateDay(next)
         maybeSendAllDone(date)
+        HabitSwipeResult(habit.title, reset = false, count = next.count, target = target)
     }
 
     suspend fun changeHabit(habitId: Long, date: LocalDate, minute: Int?, undo: Boolean = false) = mutex.withLock {

@@ -79,11 +79,6 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
                 else onCompleted("已完成：${task.title}！bb真厉害！💗") { onToggleTask(task.id) }
                 onSwipeTask(task.id)
             } else if (habit != null) {
-                if (!done) {
-                    val text = if (count + 1 >= target) "已完成：${habit.title}！bb真厉害！💗"
-                    else "${habit.title} +1，bb真厉害！💗"
-                    onCompleted(text) { onStep(habit.id, null, true) }
-                } else onCompleted("次数重置：${habit.title}") { null }
                 onSwipeHabit(habit.id)
             }
         }) {
@@ -107,13 +102,13 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
                 if (task != null) Text(
                     listOf(marker, schedule).filter { it.isNotEmpty() }.joinToString(" "),
                     color = Muted, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
-                if (habit != null) TextButton(enabled = canCheck && (!done || (entry.minute == null && target == 1)), onClick = {
+                if (habit != null) TextButton(enabled = canCheck && !done, onClick = {
                     if (!done) {
                         val text = if (target == 1 || count + 1 >= target) "已完成：${habit.title}！bb真厉害！💗"
                         else "${habit.title} +1，bb真厉害！💗"
                         onCompleted(text) { onStep(habit.id, null, true) }
                     }
-                    onStep(habit.id, entry.minute, done)
+                    onStep(habit.id, entry.minute, false)
                 }) {
                     Text(if (done) "$count/$target ✓" else "$count/$target ＋")
                 }

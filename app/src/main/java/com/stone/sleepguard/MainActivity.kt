@@ -177,7 +177,18 @@ class MainActivity : ComponentActivity() {
                                     onSaveHabit = { habit, times -> runAction { planRepo.saveHabit(habit, times); PlanScheduler.rebuild(this@MainActivity) } },
                                     onDeleteHabit = { id -> runAction { planRepo.deleteHabit(id); PlanScheduler.rebuild(this@MainActivity) } },
                                     onHabitStep = { id, date, minute, undo -> runAction { planRepo.changeHabit(id, date, minute, undo) } },
-                                    onHabitSwipe = { id, date -> runAction { planRepo.swipeHabit(id, date) } },
+                                    onHabitSwipe = { id, date -> runAction {
+                                        val result = planRepo.swipeHabit(id, date)
+                                        if (result != null) {
+                                            completionNotice = when {
+                                                result.reset -> "次数重置：${result.title}" to null
+                                                result.count >= result.target -> "已完成：${result.title}！bb真厉害！💗" to
+                                                    { runAction { planRepo.changeHabit(id, date, null, true) } }
+                                                else -> "${result.title} +1，bb真厉害！💗" to
+                                                    { runAction { planRepo.changeHabit(id, date, null, true) } }
+                                            }
+                                        }
+                                    } },
                                     onCompleted = { text, undo -> completionNotice = text to undo })
                                 2 -> RecordsScreen(records, { feelingId = it }, { photo(it) }, { share(it) }, { id, text -> runAction { app.repository.reason(id, text) } },
                                     onEdit = { id, edit -> runAction { app.repository.edit(id, edit) } },
