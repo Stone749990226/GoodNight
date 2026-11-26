@@ -98,8 +98,9 @@ data class NightRecord(
             .maxOrNull() ?: lastSleep
     }
     val hasGap get() = events.any { it.type == "GAP" }
+    val lateWake get() = night.wakeAt?.let { it > wakeTimestamp(night.date, night.targetWake) + 5 * 3_600_000L } == true
     val overslept get() = interval?.let { it > night.maxSleepMinutes.coerceAtLeast(60) * 60_000L } == true
-    val valid get() = night.wakeAt != null && !hasGap && !overslept
+    val valid get() = night.wakeAt != null && !overslept && !lateWake
     val interval: Long? get() = finalBedAt?.let { bed -> night.wakeAt?.let { (it - bed).coerceAtLeast(0) } }
     val lastScreenOff get() = events.filter { it.type == "SCREEN_OFF" && it.at >= night.lastSleepAt && it.at <= (night.wakeAt ?: Long.MAX_VALUE) }.maxByOrNull { it.at }?.at
     val morningUnlock get() = night.wakeAt?.let { wake -> events.filter { it.type == "UNLOCK" && it.at in (wake - 300_000)..wake }.maxByOrNull { it.at }?.at }

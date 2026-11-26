@@ -1,5 +1,6 @@
 package com.stone.sleepguard
 
+import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.Context
 import android.hardware.*
@@ -26,7 +27,7 @@ import kotlinx.coroutines.delay
 @Composable internal fun SettingsScreen(settings: SleepSettings, email: EmailSettings, role: Role?, tick: Int, context: Context,
     onSave: (SleepSettings) -> Unit, onSaveEmail: (EmailSettings) -> Unit, onTestEmail: () -> Unit,
     onNotifications: () -> Unit, onOverlay: () -> Unit, onBattery: () -> Unit, onBackground: () -> Unit,
-    onDiagnostic: () -> Unit) {
+    onDiagnostic: () -> Unit, onAlarm: () -> Unit) {
     SectionLabel("按你的节奏", "PREFERENCES")
     var editBed by remember { mutableStateOf(false) }; var editWake by remember { mutableStateOf(false) }
     var editMaxSleep by remember { mutableStateOf(false) }
@@ -65,11 +66,13 @@ import kotlinx.coroutines.delay
     val notifications = remember(tick) { context.getSystemService(NotificationManager::class.java).areNotificationsEnabled() }
     val overlays = remember(tick) { Settings.canDrawOverlays(context) }
     val battery = remember(tick) { context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName) }
+    val alarm = remember(tick) { Build.VERSION.SDK_INT < 31 || context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms() }
     SoftCard {
-        Text("让守候保持在线", fontSize = 17.sp, color = Cream)
+        Text("权限申请", fontSize = 17.sp, color = Cream)
         SettingRow("通知", if (notifications) "已开启" else "去开启", onNotifications)
         SettingRow("悬浮提醒", if (overlays) "已开启" else "去开启", onOverlay)
         SettingRow("电池优化豁免", if (battery) "已开启" else "去开启", onBattery)
+        SettingRow("闹钟提醒", if (alarm) "已开启" else "去开启", onAlarm)
         SettingRow("后台运行与自启动", "去检查", onBackground)
         Text("请允许晚安后台运行，并在最近任务中锁定。厂商后台设置需在系统内确认。", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
     }

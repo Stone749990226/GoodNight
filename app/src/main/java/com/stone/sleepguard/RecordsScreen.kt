@@ -58,7 +58,7 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Metric("平均就寝", stats.averageBed, Modifier.weight(1f)); Metric("平均醒来", stats.averageWake, Modifier.weight(1f)); Metric("达标率", stats.rate?.let { "$it%" } ?: "—", Modifier.weight(1f))
         }
-        Text("${stats.total} 晚记录 · ${stats.valid} 晚有效；缺失、未完成、监控中断及超过时长上限的记录不参与平均。", fontSize = 11.sp, color = Muted, lineHeight = 18.sp)
+        Text("${stats.total} 晚记录 · ${stats.valid} 晚有效；未完成、超过最长时长或晚于目标 5 小时醒来的记录不参与平均。", fontSize = 11.sp, color = Muted, lineHeight = 18.sp)
         Trend(selected)
     }
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -160,8 +160,9 @@ private fun LocalDate.shortText(): String = "$monthValue.$dayOfMonth"
             }
             Text(if (expanded) "收起 −" else "展开 +", color = Mint, fontSize = 12.sp)
         }
-        if (record.hasGap) Text("包含监控缺口，未计入作息平均。", color = Amber, fontSize = 12.sp)
+        if (record.hasGap) Text("包含监控缺口，仍按记录时间计入平均。", color = Amber, fontSize = 12.sp)
         if (record.overslept) Text("超过设定的最多睡眠时长（${record.night.maxSleepMinutes / 60} 小时），未计入平均。", color = Amber, fontSize = 12.sp)
+        if (record.lateWake) Text("点击早安晚于目标 5 小时，未计入平均。", color = Amber, fontSize = 12.sp)
         if (expanded) {
             HorizontalDivider(color = Color(0xFF30424C))
             Text("首次晚安 ${clock(record.night.firstSleepAt)}\n最终就寝 ${clock(record.finalBedAt)}\n末次灭屏 ${clock(record.lastScreenOff)} · 晨起解锁参考 ${clock(record.morningUnlock)}\n记录间隔 ${intervalText(record.interval)}", color = Muted, fontSize = 13.sp, lineHeight = 24.sp)

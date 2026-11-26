@@ -32,6 +32,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import java.io.File
+import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
     private val app get() = application as SleepApp
@@ -76,6 +77,9 @@ class MainActivity : ComponentActivity() {
                         while (true) { now = System.currentTimeMillis(); power = powerStatus(this@MainActivity); delay(1000) }
                     }
                 }
+                LaunchedEffect(tick) {
+                    if (intent.getBooleanExtra("plan", false)) { tab = 1; intent.removeExtra("plan") }
+                }
                 LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); if (app.message.value == it) app.message.value = null } }
                 LaunchedEffect(deleted) {
                     val record = deleted ?: return@LaunchedEffect
@@ -110,12 +114,20 @@ class MainActivity : ComponentActivity() {
                 }
                 val active = records.firstOrNull { it.night.phase != Phase.AWAKE }
                 val lastAwake = records.firstOrNull { it.night.phase == Phase.AWAKE }
+                val today = LocalDate.now()
+                val planRepo = app.planRepository
+                val planTasks by remember(today) { planRepo.tasks(today) }.collectAsStateWithLifecycle(emptyList())
+                val planHabits by planRepo.habits().collectAsStateWithLifecycle(emptyList())
+                val planReminders by planRepo.reminders().collectAsStateWithLifecycle(emptyList())
+                val planCheckIns by remember(today) { planRepo.checkIns(today) }.collectAsStateWithLifecycle(emptyList())
                 Scaffold(containerColor = Ink, contentColor = Cream, snackbarHost = { SnackbarHost(snackbar) }, bottomBar = {
-                    Row(Modifier.fillMaxWidth().background(Ink).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceAround) {
-                        listOf("今晚", "记录", "设置").forEachIndexed { i, label ->
-                            Column(Modifier.clip(RoundedCornerShape(18.dp)).clickable { tab = i }.padding(horizontal = 28.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(Modifier.fillMaxWidth().background(Ink).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        listOf("今晚", "计划", "记录", "设置").forEachIndexed { i, label ->
+                            Column(Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).clickable { tab = i }.padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 NavMark(i, tab == i); Spacer(Modifier.height(7.dp))
-                                Text(label, color = if (tab == i) Mint else Muted, fontSize = 12.sp, fontWeight = if (tab == i) FontWeight.SemiBold else FontWeight.Normal)
+                                Text(label, color = if (tab == i) Mint else Muted, fontSize = 12.sp,
+                                    maxLines = 1, softWrap = false, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    fontWeight = if (tab == i) FontWeight.SemiBold else FontWeight.Normal)
                             }
                         }
                     }
@@ -133,8 +145,15 @@ class MainActivity : ComponentActivity() {
                                     onWake = wakeNow,
                                     onReason = { id, text -> runAction { app.repository.reason(id, text) } },
                                     onFeeling = { feelingId = it }, onPhoto = { photo(it) },
-                                    onShare = { id -> share(records.filter { it.night.id == id }) }, onPermissions = { tab = 2 }, permissionTick = tick, context = this@MainActivity)
-                                1 -> RecordsScreen(records, { feelingId = it }, { photo(it) }, { share(it) }, { id, text -> runAction { app.repository.reason(id, text) } },
+                                    onShare = { id -> share(records.filter { it.night.id == id }) }, onPermissions = { tab = 3 }, permissionTick = tick, context = this@MainActivity)
+                                1 -> PlanScreen(today, planTasks, planHabits, planReminders, planCheckIns,
+                                    onAddTask = { title -> runAction { planRepo.addTask(title, today, null, null) } },
+                                    onToggleTask = { id -> runAction { planRepo.toggleTask(id) } },
+                                    onDeleteTask = { id -> runAction { planRepo.deleteTask(id) } },
+                                    onSaveHabit = { habit, times -> runAction { planRepo.saveHabit(habit, times); PlanScheduler.rebuild(this@MainActivity) } },
+                                    onDeleteHabit = { id -> runAction { planRepo.deleteHabit(id); PlanScheduler.rebuild(this@MainActivity) } },
+                                    onToggleSlot = { id, date, minute -> runAction { planRepo.toggleSlot(id, date, minute) } })
+                                2 -> RecordsScreen(records, { feelingId = it }, { photo(it) }, { share(it) }, { id, text -> runAction { app.repository.reason(id, text) } },
                                     onEdit = { id, edit -> runAction { app.repository.edit(id, edit) } },
                                     onDelete = { id -> runAction { app.repository.deleteNight(id)?.let { deleted = it } } },
                                     scrollState = pageScroll)
@@ -146,7 +165,8 @@ class MainActivity : ComponentActivity() {
                                         else openSettings(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) },
                                     onOverlay = { openSettings(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) },
                                     onBattery = { openSettings(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))) },
-                                    onBackground = { openBackgroundSettings() }, onDiagnostic = { diagnostic = true })
+                                    onBackground = { openBackgroundSettings() }, onDiagnostic = { diagnostic = true },
+                                    onAlarm = { if (Build.VERSION.SDK_INT >= 31) openSettings(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName"))) })
                             }
                             if (working) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Mint)
                         }
@@ -179,7 +199,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume(); visible = true; permissionTick.value++
         MonitorService.dismissMorningPrompt()
-        app.scope.launch { if (!MonitorService.running) app.repository.markRecovery() }
+        app.scope.launch { if (!MonitorService.running) app.repository.markRecovery(); PlanScheduler.rebuild(this@MainActivity) }
     }
     override fun onPause() { visible = false; super.onPause() }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); permissionTick.value++ }

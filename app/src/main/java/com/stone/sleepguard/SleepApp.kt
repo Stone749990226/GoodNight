@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 class SleepApp : Application() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val repository by lazy { SleepRepository(this) }
+    val planRepository by lazy { PlanRepository(this) }
     val preferences by lazy { SleepPreferences(this) }
     val rolePreferences by lazy { RolePreferences(this) }
     val emailPreferences by lazy { EmailPreferences(this) }
@@ -21,6 +22,7 @@ class SleepApp : Application() {
         scope.launch {
             preferences.migrateDefaults()
             repository.removeShortRecords()
+            PlanScheduler.rebuild(this@SleepApp)
         }
     }
 }

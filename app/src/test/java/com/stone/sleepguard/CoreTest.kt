@@ -65,11 +65,43 @@ class CoreTest {
         val results = (1100L..4000L step 100).map { t -> detector.sample(x, 0f, z, t, true) }
         assertTrue(results.filterNotNull().any { it.startsWith("倾斜") })
     }
+    @Test fun lateWakeBeyondTargetFiveHoursAndGapsAreHandled() {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val date = "2026-11-19"
+        val bed = ZonedDateTime.of(2026, 11, 19, 23, 30, 0, 0, zone).toInstant().toEpochMilli()
+        val target = wakeTimestamp(date, 450, zone)
+        fun record(wake: Long, gap: Boolean = false) = NightRecord(
+            Night(id = 11, date = date, firstSleepAt = bed, lastSleepAt = bed, targetBed = 1410,
+                targetWake = 450, wakeAt = wake, phase = Phase.AWAKE, maxSleepMinutes = 1440),
+            emptyList(), if (gap) listOf(NightEvent(nightId = 11, at = wake, type = "GAP", detail = "test")) else emptyList())
+        assertTrue(record(target + 5 * 3_600_000L - 60_000L).valid)
+        assertTrue(record(target + 5 * 3_600_000L).valid)
+        assertFalse(record(target + 5 * 3_600_000L + 60_000L).valid)
+        assertTrue(record(target + 3_600_000L, gap = true).valid)
+    }
+    @Test fun workdayFrequencySkips2026HolidaysAndUsesMakeupDays() {
+        val habit = Habit(id = 1, title = "test", frequency = FREQ_WORKDAYS, startDate = 0)
+        assertFalse(habit.isDue(LocalDate.of(2026, 2, 17)))
+        assertFalse(habit.isDue(LocalDate.of(2026, 2, 15)))
+        assertTrue(habit.isDue(LocalDate.of(2026, 2, 14)))
+        assertTrue(habit.isDue(LocalDate.of(2026, 10, 10)))
+        assertTrue(habit.isDue(LocalDate.of(2026, 2, 13)))
+        assertTrue(habit.isDue(LocalDate.of(2027, 2, 17)))
+    }
+    @Test fun weekdayHabitOnlyRunsOnSelectedDays() {
+        val habit = Habit(id = 2, title = "test", frequency = FREQ_WEEKDAYS, weekdayMask = (1 shl 0) or (1 shl 2), startDate = 0)
+        assertTrue(habit.isDue(LocalDate.of(2026, 11, 23)))
+        assertFalse(habit.isDue(LocalDate.of(2026, 11, 24)))
+        assertTrue(habit.isDue(LocalDate.of(2026, 11, 25)))
+    }
     @Test fun oversleepingPastConfiguredLimitIsNotValid() {
-        val night = Night(id = 4, date = "2026-11-19", firstSleepAt = 0, lastSleepAt = 0,
-            targetBed = 1410, targetWake = 450, wakeAt = 9 * 3_600_000L, phase = Phase.AWAKE, maxSleepMinutes = 600)
+        val zone = ZoneId.of("Asia/Shanghai")
+        val bed = ZonedDateTime.of(2026, 11, 19, 23, 30, 0, 0, zone).toInstant().toEpochMilli()
+        fun at(hour: Int, minute: Int) = ZonedDateTime.of(2026, 11, 20, hour, minute, 0, 0, zone).toInstant().toEpochMilli()
+        val night = Night(id = 4, date = "2026-11-19", firstSleepAt = bed, lastSleepAt = bed,
+            targetBed = 1410, targetWake = 450, wakeAt = at(8, 30), phase = Phase.AWAKE, maxSleepMinutes = 600)
         assertTrue(NightRecord(night, emptyList(), emptyList()).valid)
-        val long = night.copy(wakeAt = 10 * 3_600_000L + 60_000L)
+        val long = night.copy(wakeAt = at(9, 31))
         val record = NightRecord(long, emptyList(), emptyList())
         assertTrue(record.overslept)
         assertFalse(record.valid)

@@ -62,7 +62,8 @@ class ShareExporter(private val context: Context, private val partner: String = 
             paragraph("${clock(r.finalBedAt)}  →  ${clock(r.night.wakeAt)}", 48f, cream)
             paragraph("首次晚安 ${clock(r.night.firstSleepAt)}  ·  ${r.disruptions.size} 次中断  ·  ${r.night.feeling ?: "感受待补充"}", 25f, muted)
             paragraph("记录间隔 ${intervalText(r.interval)}", 25f, muted)
-            if (r.hasGap) paragraph("含监控缺口，不参与作息平均。", 25f, Color.rgb(231, 195, 141))
+            if (r.hasGap) paragraph("含监控缺口，仍按记录时间计入平均。", 25f, Color.rgb(231, 195, 141))
+            if (r.lateWake) paragraph("点击早安晚于目标5小时，未计入平均。", 25f, Color.rgb(231, 195, 141))
             r.interruptions.sortedBy { it.detectedAt }.forEach { interruption ->
                 paragraph(if (interruption.morning) "${clock(interruption.detectedAt)} · 起床操作" else "${clock(interruption.detectedAt)} → ${clock(interruption.returnedAt)}  ${interruption.reason ?: "原因待补充"}", 27f)
             }
