@@ -214,23 +214,23 @@ class PlanRepository(private val context: Context) {
     fun reminders(): Flow<List<HabitReminder>> = dao.observeReminders()
     fun days(date: LocalDate): Flow<List<HabitDay>> = dao.observeDays(date.toEpochDay().toInt())
 
-    /** 日期格预览：true=完成，false=未完成；每天最多三个。 */
-    fun marks(start: LocalDate, end: LocalDate): Flow<Map<Int, List<Boolean>>> = combine(
+    /** 日期格预览：true=当天计划和习惯都完成；false=还有未完成；无内容不显示。 */
+    fun marks(start: LocalDate, end: LocalDate): Flow<Map<Int, Boolean>> = combine(
         dao.observeTasksRange(start.toEpochDay().toInt(), end.toEpochDay().toInt()),
         dao.observeHabits(),
         dao.observeDaysRange(start.toEpochDay().toInt(), end.toEpochDay().toInt()),
     ) { tasks, habits, days ->
         val byDay = days.associateBy { it.habitId to it.date }
-        val result = mutableMapOf<Int, List<Boolean>>()
+        val result = mutableMapOf<Int, Boolean>()
         var date = start
         while (!date.isAfter(end)) {
             val epoch = date.toEpochDay().toInt()
             val marks = tasks.filter { it.dueDate == epoch }.map { it.completedAt != null }.toMutableList()
             habits.filter { it.isDue(date) }.forEach { habit ->
-                val day = byDay[habit.id to epoch] ?: days.firstOrNull { it.habitId == habit.id && it.date == epoch }
+                val day = byDay[habit.id to epoch]
                 marks.add((day?.count ?: 0) >= (day?.dayTarget ?: habit.targetCount).coerceAtLeast(1))
             }
-            if (marks.isNotEmpty()) result[epoch] = marks.sortedBy { it }.take(3)
+            if (marks.isNotEmpty()) result[epoch] = marks.all { it }
             date = date.plusDays(1)
         }
         result

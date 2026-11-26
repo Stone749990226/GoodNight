@@ -36,7 +36,7 @@ internal fun PlanScreen(
     habits: List<Habit>,
     reminders: List<HabitReminder>,
     days: List<HabitDay>,
-    marks: Map<Int, List<Boolean>>,
+    marks: Map<Int, Boolean>,
     scrollState: ScrollState,
     onSelectDate: (LocalDate) -> Unit,
     onSaveTask: (PlanTask) -> Unit,
@@ -198,7 +198,7 @@ internal fun PlanScreen(
     }
 }
 
-@Composable private fun MonthGrid(month: YearMonth, selectedDate: LocalDate, marks: Map<Int, List<Boolean>>, onSelectDate: (LocalDate) -> Unit) {
+@Composable private fun MonthGrid(month: YearMonth, selectedDate: LocalDate, marks: Map<Int, Boolean>, onSelectDate: (LocalDate) -> Unit) {
     val first = month.atDay(1)
     val start = first.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     Column(Modifier.fillMaxWidth()) {
@@ -328,10 +328,10 @@ internal fun PlanScreen(
 
 }
 
-@Composable private fun DateDots(marks: List<Boolean>?) {    Row(Modifier.height(6.dp).padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        (marks ?: emptyList()).take(3).forEach { done ->
-            Box(Modifier.size(4.dp).clip(RoundedCornerShape(50))
-                .background(if (done) Mint else Color(0xFFE88C8C)))
+@Composable private fun DateDots(done: Boolean?) {
+    Box(Modifier.height(6.dp).padding(top = 2.dp), contentAlignment = Alignment.Center) {
+        if (done != null) {
+            Box(Modifier.size(4.dp).clip(RoundedCornerShape(50)).background(if (done) Mint else Amber))
         }
     }
 }
