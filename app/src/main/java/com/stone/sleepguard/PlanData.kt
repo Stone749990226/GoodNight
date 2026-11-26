@@ -162,8 +162,8 @@ class PlanRepository(private val context: Context) {
         dao.insertTask(PlanTask(title = clean, dueDate = date.toEpochDay().toInt(), dueMinute = dueMinute, reminderMinute = reminderMinute))
     }
 
-    suspend fun toggleTask(id: Long) = mutex.withLock {
-        val task = dao.tasks(LocalDate.now().toEpochDay().toInt()).firstOrNull { it.id == id } ?: return@withLock
+    suspend fun toggleTask(id: Long, date: LocalDate) = mutex.withLock {
+        val task = dao.tasks(date.toEpochDay().toInt()).firstOrNull { it.id == id } ?: return@withLock
         dao.updateTask(task.copy(completedAt = if (task.completedAt == null) System.currentTimeMillis() else null))
     }
 

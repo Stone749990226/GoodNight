@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
                 val message by app.message.collectAsStateWithLifecycle()
                 val snackbar = remember { SnackbarHostState() }
                 var tab by rememberSaveable { mutableIntStateOf(0) }
+                var planDate by rememberSaveable { mutableLongStateOf(LocalDate.now().toEpochDay()) }
                 var feelingId by rememberSaveable { mutableStateOf<Long?>(null) }
                 var morningPrompt by rememberSaveable { mutableStateOf(false) }
                 var wakeDialog by rememberSaveable { mutableStateOf(false) }
@@ -115,11 +116,12 @@ class MainActivity : ComponentActivity() {
                 val active = records.firstOrNull { it.night.phase != Phase.AWAKE }
                 val lastAwake = records.firstOrNull { it.night.phase == Phase.AWAKE }
                 val today = LocalDate.now()
+                val selectedPlanDate = LocalDate.ofEpochDay(planDate)
                 val planRepo = app.planRepository
-                val planTasks by remember(today) { planRepo.tasks(today) }.collectAsStateWithLifecycle(emptyList())
+                val planTasks by remember(selectedPlanDate) { planRepo.tasks(selectedPlanDate) }.collectAsStateWithLifecycle(emptyList())
                 val planHabits by planRepo.habits().collectAsStateWithLifecycle(emptyList())
                 val planReminders by planRepo.reminders().collectAsStateWithLifecycle(emptyList())
-                val planCheckIns by remember(today) { planRepo.checkIns(today) }.collectAsStateWithLifecycle(emptyList())
+                val planCheckIns by remember(selectedPlanDate) { planRepo.checkIns(selectedPlanDate) }.collectAsStateWithLifecycle(emptyList())
                 Scaffold(containerColor = Ink, contentColor = Cream, snackbarHost = { SnackbarHost(snackbar) }, bottomBar = {
                     Row(Modifier.fillMaxWidth().background(Ink).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         listOf("今晚", "计划", "记录", "设置").forEachIndexed { i, label ->
@@ -146,9 +148,10 @@ class MainActivity : ComponentActivity() {
                                     onReason = { id, text -> runAction { app.repository.reason(id, text) } },
                                     onFeeling = { feelingId = it }, onPhoto = { photo(it) },
                                     onShare = { id -> share(records.filter { it.night.id == id }) }, onPermissions = { tab = 3 }, permissionTick = tick, context = this@MainActivity)
-                                1 -> PlanScreen(today, planTasks, planHabits, planReminders, planCheckIns,
-                                    onAddTask = { title -> runAction { planRepo.addTask(title, today, null, null) } },
-                                    onToggleTask = { id -> runAction { planRepo.toggleTask(id) } },
+                                1 -> PlanScreen(today, selectedPlanDate, planTasks, planHabits, planReminders, planCheckIns,
+                                    onSelectDate = { planDate = it.toEpochDay() },
+                                    onAddTask = { title -> runAction { planRepo.addTask(title, selectedPlanDate, null, null) } },
+                                    onToggleTask = { id -> runAction { planRepo.toggleTask(id, selectedPlanDate) } },
                                     onDeleteTask = { id -> runAction { planRepo.deleteTask(id) } },
                                     onSaveHabit = { habit, times -> runAction { planRepo.saveHabit(habit, times); PlanScheduler.rebuild(this@MainActivity) } },
                                     onDeleteHabit = { id -> runAction { planRepo.deleteHabit(id); PlanScheduler.rebuild(this@MainActivity) } },

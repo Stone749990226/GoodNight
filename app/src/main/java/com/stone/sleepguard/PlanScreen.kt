@@ -8,21 +8,27 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAdjusters
 import java.time.format.TextStyle
 import java.util.Locale
 
 @Composable
 internal fun PlanScreen(
     today: LocalDate,
+    selectedDate: LocalDate,
     tasks: List<PlanTask>,
     habits: List<Habit>,
     reminders: List<HabitReminder>,
     checkIns: List<HabitCheckIn>,
+    onSelectDate: (LocalDate) -> Unit,
     onAddTask: (String) -> Unit,
     onToggleTask: (Long) -> Unit,
     onDeleteTask: (Long) -> Unit,
@@ -33,12 +39,43 @@ internal fun PlanScreen(
     var addTask by remember { mutableStateOf(false) }
     var editingHabit by remember { mutableStateOf<Habit?>(null) }
     var creatingHabit by remember { mutableStateOf(false) }
-    SoftCard {
+    var addChoice by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("今日待办", fontSize = 18.sp, color = Cream, modifier = Modifier.weight(1f))
-            TextButton(onClick = { addTask = true }) { Text("添加") }
+            Text("${selectedDate.year}年${selectedDate.monthValue}月", fontSize = 22.sp, color = Cream,
+                fontWeight = FontWeight.Light, modifier = Modifier.weight(1f))
+            if (selectedDate != today) TextButton(onClick = { onSelectDate(today) }) { Text("今天") }
+            TextButton(onClick = { addChoice = true }) {
+                Text("+", fontSize = 28.sp, color = Mint)
+            }
         }
-        if (tasks.isEmpty()) Text("今天没有待办", color = Muted, fontSize = 12.sp)
+        val weekStart = selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            (0..6).forEach { offset ->
+                val date = weekStart.plusDays(offset.toLong())
+                val selected = date == selectedDate
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).clickable { onSelectDate(date) }
+                    .padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.CHINA), color = Muted, fontSize = 11.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Box(Modifier.size(36.dp).clip(RoundedCornerShape(50)).background(if (selected) Mint else Color.Transparent),
+                        contentAlignment = Alignment.Center) {
+                        Text("${date.dayOfMonth}", color = if (selected) Ink else Cream, fontSize = 15.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = { onSelectDate(weekStart.minusWeeks(1)) }) { Text("‹ 上一周") }
+            Text(if (selectedDate == today) "今天" else selectedDate.format(DateTimeFormatter.ofPattern("M月d日")),
+                color = Muted, fontSize = 12.sp)
+            TextButton(onClick = { onSelectDate(weekStart.plusWeeks(1)) }) { Text("下一周 ›") }
+        }
+    }
+    SoftCard {
+        Text("计划", fontSize = 18.sp, color = Cream)
+        if (tasks.isEmpty()) Text("没有计划", color = Muted, fontSize = 12.sp)
         tasks.forEach { task ->
             Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = task.completedAt != null, onCheckedChange = { onToggleTask(task.id) },
@@ -51,12 +88,9 @@ internal fun PlanScreen(
         }
     }
     SoftCard {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("习惯", fontSize = 18.sp, color = Cream, modifier = Modifier.weight(1f))
-            TextButton(onClick = { creatingHabit = true }) { Text("添加") }
-        }
-        if (habits.none { it.isDue(today) }) Text("今天没有习惯", color = Muted, fontSize = 12.sp)
-        habits.filter { it.isDue(today) }.forEach { habit ->
+        Text("习惯", fontSize = 18.sp, color = Cream)
+        if (habits.none { it.isDue(selectedDate) }) Text("没有习惯", color = Muted, fontSize = 12.sp)
+        habits.filter { it.isDue(selectedDate) }.forEach { habit ->
             val times = reminders.filter { it.habitId == habit.id }.map { it.minute }.sorted()
             val completed = times.count { minute -> checkIns.any { it.habitId == habit.id && it.minute == minute && it.completedAt != null } }
             Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -70,7 +104,7 @@ internal fun PlanScreen(
                 times.forEach { minute ->
                     val done = checkIns.any { it.habitId == habit.id && it.minute == minute && it.completedAt != null }
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = done, onCheckedChange = { onToggleSlot(habit.id, today, minute) },
+                        Checkbox(checked = done, onCheckedChange = { onToggleSlot(habit.id, selectedDate, minute) },
                             colors = CheckboxDefaults.colors(checkedColor = Mint, uncheckedColor = Muted, checkmarkColor = Ink))
                         Text(minutesText(minute), color = if (done) Muted else Cream, fontSize = 14.sp)
                     }
@@ -78,16 +112,28 @@ internal fun PlanScreen(
             }
         }
     }
+    if (addChoice) AddChoiceDialog(onDismiss = { addChoice = false }, onTask = { addChoice = false; addTask = true },
+        onHabit = { addChoice = false; creatingHabit = true })
     if (addTask) AddTaskDialog(onDismiss = { addTask = false }, onSave = { title -> addTask = false; onAddTask(title) })
-    if (creatingHabit) HabitEditorDialog(null, today, onDismiss = { creatingHabit = false }) { habit, mins ->
+    if (creatingHabit) HabitEditorDialog(null, selectedDate, onDismiss = { creatingHabit = false }) { habit, mins ->
         creatingHabit = false; onSaveHabit(habit, mins)
     }
     editingHabit?.let { habit ->
         val initial = reminders.filter { it.habitId == habit.id }.map { it.minute }.sorted()
-        HabitEditorDialog(habit.copy(weekdayMask = habit.weekdayMask), today, initial) { edited, mins ->
+        HabitEditorDialog(habit.copy(weekdayMask = habit.weekdayMask), selectedDate, initial) { edited, mins ->
             editingHabit = null; onSaveHabit(edited, mins)
         }
     }
+}
+
+@Composable private fun AddChoiceDialog(onDismiss: () -> Unit, onTask: () -> Unit, onHabit: () -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("创建") }, text = {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onTask, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("计划") }
+            OutlinedButton(onClick = onHabit, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("习惯") }
+        }
+    }, confirmButton = {}, dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        containerColor = Panel, titleContentColor = Cream, textContentColor = Cream)
 }
 
 @Composable private fun AddTaskDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
