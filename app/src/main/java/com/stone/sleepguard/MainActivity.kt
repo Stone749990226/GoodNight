@@ -135,7 +135,7 @@ class MainActivity : ComponentActivity() {
                 val planReminders by planRepo.reminders().collectAsStateWithLifecycle(emptyList())
                 val planCheckIns by remember(selectedPlanDate) { planRepo.days(selectedPlanDate) }.collectAsStateWithLifecycle(emptyList())
                 val planMarks by remember(today) { planRepo.marks(today.minusDays(180), today.plusDays(180)) }.collectAsStateWithLifecycle(emptyMap())
-                Scaffold(floatingActionButton = { if (tab == 1) FloatingActionButton(onClick = { quickAdd = true }, containerColor = Mint, contentColor = Ink, shape = RoundedCornerShape(50)) { Text("+", fontSize = 30.sp, fontWeight = FontWeight.Light) } }, containerColor = Ink, contentColor = Cream, snackbarHost = {
+                Scaffold(containerColor = Ink, contentColor = Cream, snackbarHost = {
                     SnackbarHost(snackbar) { data ->
                         Snackbar(snackbarData = data, containerColor = Panel, contentColor = Cream,
                             actionColor = Mint, actionContentColor = Ink,
@@ -153,9 +153,10 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }) { padding ->
-                    key(tab) {
-                        val pageScroll = rememberScrollState()
-                        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(pageScroll).padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Box(Modifier.fillMaxSize().padding(padding)) {
+                        key(tab) {
+                            val pageScroll = rememberScrollState()
+                            Column(Modifier.fillMaxSize().verticalScroll(pageScroll).padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             when (tab) {
                                 0 -> TonightScreen(active, lastAwake, now, power, preferences, working,
                                     partner = partner,
@@ -194,6 +195,11 @@ class MainActivity : ComponentActivity() {
                                     onAlarm = { if (Build.VERSION.SDK_INT >= 31) openSettings(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName"))) })
                             }
                             if (working) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Mint)
+                        }
+                    }
+                        if (tab == 1) FloatingActionButton(onClick = { quickAdd = true }, containerColor = Mint, contentColor = Ink,
+                            shape = RoundedCornerShape(50), modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 24.dp)) {
+                            Text("+", fontSize = 30.sp, fontWeight = FontWeight.Light)
                         }
                     }
                 }

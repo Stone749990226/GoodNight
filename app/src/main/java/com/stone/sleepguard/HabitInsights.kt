@@ -67,7 +67,11 @@ internal fun streaks(habit: Habit, rows: List<HabitDay>, today: LocalDate): Pair
                         repeat(7) { index ->
                             val d = week.getOrNull(index)
                             val row = byDate[d?.toEpochDay()?.toInt()]
-                            val fill = when { row?.completedAt != null -> Mint; (row?.count ?: 0) > 0 -> Amber; else -> Ink }
+                            val fill = when {
+                                row?.completedAt != null -> Mint
+                                d != null && d <= today && h.isDue(d) -> Amber
+                                else -> Ink
+                            }
                             Box(Modifier.weight(1f).height(34.dp).clickable(enabled = d != null && d <= today && h.isDue(d)) { correcting = h to d!! }.background(if (d == null) Panel else fill, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
                                 if (d != null) Text(d.dayOfMonth.toString(), color = if (fill != Ink) Ink else if (d <= today && h.isDue(d)) Cream else Muted.copy(alpha = .55f))
                             }
@@ -75,7 +79,7 @@ internal fun streaks(habit: Habit, rows: List<HabitDay>, today: LocalDate): Pair
                     } }
                     val range = first.toEpochDay().toInt() until first.toEpochDay().toInt() + length
                     val data = history.filter { it.date in range }
-                    Text("薄荷绿 达标  ·  琥珀色 部分完成", color = Muted, fontSize = 12.sp)
+                    Text("薄荷绿 达标  ·  琥珀色 未完成/部分完成", color = Muted, fontSize = 12.sp)
                     Text("达标 ${data.count { it.completedAt != null }} 天  ·  打卡 ${data.sumOf { it.count }} 次", color = Cream)
                 }
                 HorizontalDivider(color = Muted.copy(alpha = .2f))

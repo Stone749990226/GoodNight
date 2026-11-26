@@ -137,17 +137,21 @@ private data class AgendaItem(val minute: Int?, val task: PlanTask? = null, val 
     } else {
         SoftCard {
             Text("计划", color = Cream, fontSize = 17.sp)
-            val pending = tasks.filter { it.completedAt == null }.sortedBy { it.dueMinute ?: -1 }
-            if (tasks.isEmpty()) Text("暂无计划", color = Muted, fontSize = 13.sp)
-            pending.forEach { item(AgendaItem(it.dueMinute, task = it)) }
-            val finished = tasks.filter { it.completedAt != null }
-            if (finished.isNotEmpty()) Text("已完成", color = Muted, fontSize = 12.sp)
-            finished.forEach { item(AgendaItem(it.dueMinute, task = it)) }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                val pending = tasks.filter { it.completedAt == null }.sortedBy { it.dueMinute ?: -1 }
+                if (tasks.isEmpty()) Text("暂无计划", color = Muted, fontSize = 13.sp)
+                pending.forEach { item(AgendaItem(it.dueMinute, task = it)) }
+                val finished = tasks.filter { it.completedAt != null }
+                if (finished.isNotEmpty()) Text("已完成", color = Muted, fontSize = 12.sp)
+                finished.forEach { item(AgendaItem(it.dueMinute, task = it)) }
+            }
         }
         SoftCard {
             Text("习惯", color = Cream, fontSize = 17.sp)
-            if (habits.isEmpty()) Text("当天没有需要打卡的习惯", color = Muted, fontSize = 13.sp)
-            habits.forEach { item(AgendaItem(null, habit = it)) }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                if (habits.isEmpty()) Text("当天没有需要打卡的习惯", color = Muted, fontSize = 13.sp)
+                habits.forEach { item(AgendaItem(null, habit = it)) }
+            }
         }
     }
 }
